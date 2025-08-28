@@ -29,7 +29,7 @@ interface LineChartComponentProps {
   maxDataPoints?: number;
 }
 
-const LineChartComponent: React.FC<LineChartComponentProps> = ({
+const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(({
   data,
   dataKey,
   title = "Chart",
@@ -63,18 +63,9 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
     return value;
   };
 
-  // Create a consistent dataset with empty values for smooth animation
-  const paddedData = React.useMemo(() => {
-    if (data.length === 0) return [];
-
-    const result = [...data];
-
-    // If we have less data than maxDataPoints, pad with null values
-    while (result.length < maxDataPoints) {
-      result.unshift({ time: "", value: 0 });
-    }
-
-    return result.slice(-maxDataPoints);
+  // Use data directly to avoid unnecessary re-renders and flicker
+  const chartData = React.useMemo(() => {
+    return data.slice(-maxDataPoints);
   }, [data, maxDataPoints]);
 
   return (
@@ -82,13 +73,14 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
       {title && <h3 className="text-lg font-semibold mb-4">{title}</h3>}
       <ResponsiveContainer width="100%" height={height}>
         <LineChart
-          data={paddedData}
+          data={chartData}
           margin={{
             top: 5,
             bottom: 5,
             left: -20,
             right: 5,
           }}
+          isAnimationActive={false}
         >
           {showGrid && <CartesianGrid strokeDasharray="3 3" />}
           <XAxis
@@ -117,13 +109,16 @@ const LineChartComponent: React.FC<LineChartComponentProps> = ({
             dataKey={dataKey}
             stroke={color}
             strokeWidth={2}
-            dot={{ fill: color, strokeWidth: 1, r: 2 }}
-            activeDot={{ r: 6, fill: color }}
+            dot={false}
+            activeDot={false}
+            isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
-};
+});
+
+LineChartComponent.displayName = 'LineChartComponent';
 
 export default LineChartComponent;

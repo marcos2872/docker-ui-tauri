@@ -94,6 +94,9 @@ struct PreviousStats {
     block_write: u64,
 }
 
+// Tempo mínimo entre cálculos de CPU (em segundos)
+const MIN_CPU_INTERVAL: u64 = 1;
+
 // Gerenciador principal do Docker
 pub struct DockerManager {
     pub docker: Docker,
@@ -779,7 +782,7 @@ impl DockerManager {
         })
     }
 
-    // Calcula CPU com cache de estatísticas anteriores
+    // Calcula CPU com cache de estatísticas anteriores - SIMPLIFICADO
     fn calculate_cpu_percentage_with_cache(
         &mut self,
         container_id: &str,
@@ -793,57 +796,43 @@ impl DockerManager {
             ) {
                 let cpu_total = cpu_usage.total_usage.unwrap_or(0);
                 let system_total = cpu_stats.system_cpu_usage.unwrap_or(0);
-
-                // Verifica se temos estatísticas anteriores para este container
-                let cpu_delta;
-                let system_delta;
-
-                if let Some(prev_stats) = self.previous_stats.get(container_id) {
-                    // Usa dados do cache interno, mas verifica se são válidos
-                    let cache_cpu_delta = cpu_total.saturating_sub(prev_stats.cpu_total);
-                    let cache_system_delta = system_total.saturating_sub(prev_stats.system_total);
-
-                    // Se o delta do cache é muito pequeno, usa precpu_stats como fallback
-                    if cache_system_delta > 0 && cache_cpu_delta <= cache_system_delta * 1 {
-                        cpu_delta = cache_cpu_delta;
-                        system_delta = cache_system_delta;
+                
+                // Verifica se temos cache anterior e se tempo suficiente passou
+                let (cpu_delta, system_delta) = if let Some(prev_stats) = self.previous_stats.get(container_id) {
+                    let time_elapsed = current_time.saturating_sub(prev_stats.timestamp);
+                    
+                    if time_elapsed >= MIN_CPU_INTERVAL {
+                        // Usa cache anterior se tempo suficiente passou
+                        let cache_cpu_delta = cpu_total.saturating_sub(prev_stats.cpu_total);
+                        let cache_system_delta = system_total.saturating_sub(prev_stats.system_total);
+                        (cache_cpu_delta, cache_system_delta)
                     } else {
-                        // Fallback para precpu_stats se cache não parece confiável
+                        // Fallback para precpu_stats se muito pouco tempo passou
                         let cpu_total_prev = precpu_usage.total_usage.unwrap_or(0);
                         let system_total_prev = precpu_stats.system_cpu_usage.unwrap_or(0);
-                        cpu_delta = cpu_total.saturating_sub(cpu_total_prev);
-                        system_delta = system_total.saturating_sub(system_total_prev);
+                        (cpu_total.saturating_sub(cpu_total_prev), system_total.saturating_sub(system_total_prev))
                     }
                 } else {
                     // Primeira vez - usa precpu_stats
                     let cpu_total_prev = precpu_usage.total_usage.unwrap_or(0);
                     let system_total_prev = precpu_stats.system_cpu_usage.unwrap_or(0);
-
-                    cpu_delta = cpu_total.saturating_sub(cpu_total_prev);
-                    system_delta = system_total.saturating_sub(system_total_prev);
-                }
+                    (cpu_total.saturating_sub(cpu_total_prev), system_total.saturating_sub(system_total_prev))
+                };
 
                 // Atualiza cache para próxima iteração
                 let (network_rx, network_tx) = self.get_network_stats(stats);
                 let (block_read, block_write) = self.get_block_stats(stats);
 
-                // Número de CPUs online (preferido) ou número de CPUs por core
+                // Número de CPUs online
                 let number_cpus = if let Some(online_cpus) = cpu_stats.online_cpus {
                     online_cpus as f64
+                } else if let Some(percpu_usage) = &cpu_usage.percpu_usage {
+                    percpu_usage.len().max(1) as f64
                 } else {
-                    // Fallback: conta CPUs disponíveis por percpu_usage
-                    if let Some(percpu_usage) = &cpu_usage.percpu_usage {
-                        // Conta apenas CPUs que não são zero (ativas)
-                        percpu_usage
-                            .iter()
-                            .filter(|&&usage| usage > 0)
-                            .count()
-                            .max(1) as f64
-                    } else {
-                        1.0 // Fallback mínimo
-                    }
+                    1.0
                 };
 
+                // Sempre atualiza o cache
                 self.previous_stats.insert(
                     container_id.to_string(),
                     PreviousStats {
@@ -857,7 +846,7 @@ impl DockerManager {
                     },
                 );
 
-                // Evita divisão por zero - só retorna 0 se system_delta for 0
+                // Evita divisão por zero
                 if system_delta == 0 {
                     return CpuCalculate {
                         online_cpus: number_cpus as u64,
@@ -865,39 +854,12 @@ impl DockerManager {
                     };
                 }
 
-                // Se cpu_delta for 0, significa que não houve uso de CPU nesse período
-                if cpu_delta == 0 {
-                    return CpuCalculate {
-                        online_cpus: number_cpus as u64,
-                        usage_cpu: 0.0,
-                    };
-                }
-
-                // Fórmula correta do Docker CLI
+                // Fórmula correta do Docker CLI: (cpu_delta / system_delta) * number_cpus * 100
                 let cpu_percent = (cpu_delta as f64 / system_delta as f64) * number_cpus * 100.0;
-
-                // Debug para valores anômalos apenas se necessário
-                if cpu_percent > number_cpus * 100.0 {
-                    eprintln!(
-                        "DEBUG CPU [{}]: cpu_delta={}, system_delta={}, cpus={}, percent={:.2}%",
-                        &container_id[..12],
-                        cpu_delta,
-                        system_delta,
-                        number_cpus,
-                        cpu_percent
-                    );
-                    // Para valores muito altos, pode haver problema nos dados
-                    return CpuCalculate {
-                        online_cpus: 0,
-                        usage_cpu: 0.0,
-                    };
-                }
-
-                // Limita resultado a um valor razoável
 
                 CpuCalculate {
                     online_cpus: number_cpus as u64,
-                    usage_cpu: cpu_percent.max(0.0).min(100.0 * number_cpus),
+                    usage_cpu: cpu_percent.max(0.0),
                 }
             } else {
                 CpuCalculate {

@@ -99,7 +99,7 @@ export function Dashboard() {
     intervalRef.current = setInterval(() => {
       getDockerSistemUsage();
       getDockerStats();
-    }, 1000);
+    }, 2000);
 
     // Cleanup interval on component unmount
     return () => {
@@ -136,11 +136,35 @@ export function Dashboard() {
           value={dockerInfo.containers_stopped.toString()}
         />
       </section>
+      
+      <section className="w-full grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card 
+          title="Memória Total" 
+          value={`${(dockerSistemUsage.memory_usage / 1024 / 1024).toFixed(0)} MB / ${(dockerSistemUsage.memory_limit / 1024 / 1024 / 1024).toFixed(1)} GB`} 
+        />
+        <Card 
+          title="Rede RX Total" 
+          value={dockerSistemUsage.network_rx_bytes < 1024 * 1024 
+            ? `${(dockerSistemUsage.network_rx_bytes / 1024).toFixed(1)} KB` 
+            : `${(dockerSistemUsage.network_rx_bytes / 1024 / 1024).toFixed(1)} MB`} 
+        />
+        <Card 
+          title="Rede TX Total" 
+          value={dockerSistemUsage.network_tx_bytes < 1024 * 1024 
+            ? `${(dockerSistemUsage.network_tx_bytes / 1024).toFixed(1)} KB` 
+            : `${(dockerSistemUsage.network_tx_bytes / 1024 / 1024).toFixed(1)} MB`} 
+        />
+        <Card 
+          title="Disco I/O Total" 
+          value={`R: ${(dockerSistemUsage.block_read_bytes / 1024 / 1024).toFixed(0)} MB | W: ${(dockerSistemUsage.block_write_bytes / 1024 / 1024).toFixed(0)} MB`} 
+        />
+      </section>
+
       <section className="w-full h-full flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-250px)] mb-10">
         <LineChartComponent
           data={cpuHistory}
           dataKey="value"
-          title={`CPU ${dockerSistemUsage.cpu_usage}% | ${(dockerSistemUsage.cpu_online * 100).toFixed(0)}%`}
+          title={`CPU Total: ${dockerSistemUsage.cpu_usage.toFixed(2)}% | ${dockerSistemUsage.cpu_online} cores`}
           color="#3b82f6"
           height={300}
           unit="%"
