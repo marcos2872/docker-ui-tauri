@@ -28,6 +28,16 @@ interface CpuDataPoint {
   value: number;
 }
 
+interface MemoryDataPoint {
+  time: string;
+  value: number;
+}
+
+interface NetworkDataPoint {
+  time: string;
+  value: number;
+}
+
 export function Dashboard() {
   const [dockerInfo, setDockerInfo] = useState<DockerInfo>({
     version: "",
@@ -53,6 +63,8 @@ export function Dashboard() {
   );
 
   const [cpuHistory, setCpuHistory] = useState<CpuDataPoint[]>([]);
+  const [memoryHistory, setMemoryHistory] = useState<MemoryDataPoint[]>([]);
+  const [networkHistory, setNetworkHistory] = useState<NetworkDataPoint[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getDockerSistemUsage = useCallback(async () => {
@@ -71,11 +83,45 @@ export function Dashboard() {
       });
 
       setCpuHistory((prev) => {
+        const cpuPercentage = sistemUsage.cpu_usage;
         const newHistory = [
           ...prev,
           {
             time: timeStr,
-            value: sistemUsage.cpu_usage,
+            value: cpuPercentage,
+          },
+        ];
+
+        return newHistory.slice(-60);
+      });
+
+      // Add Memory data to history
+      setMemoryHistory((prev) => {
+        const memoryUsagePercent =
+          sistemUsage.memory_limit > 0
+            ? (sistemUsage.memory_usage / sistemUsage.memory_limit) * 100
+            : 0;
+        const newHistory = [
+          ...prev,
+          {
+            time: timeStr,
+            value: memoryUsagePercent,
+          },
+        ];
+
+        return newHistory.slice(-60);
+      });
+
+      // Add Network data to history (total TX + RX in MB)
+      setNetworkHistory((prev) => {
+        const networkTotal =
+          (sistemUsage.network_rx_bytes + sistemUsage.network_tx_bytes) /
+          (1024 * 1024);
+        const newHistory = [
+          ...prev,
+          {
+            time: timeStr,
+            value: networkTotal,
           },
         ];
 
@@ -136,29 +182,29 @@ export function Dashboard() {
           value={dockerInfo.containers_stopped.toString()}
         />
       </section>
-      
-      <section className="w-full grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card 
-          title="Memória Total" 
-          value={`${(dockerSistemUsage.memory_usage / 1024 / 1024).toFixed(0)} MB / ${(dockerSistemUsage.memory_limit / 1024 / 1024 / 1024).toFixed(1)} GB`} 
+
+      {/*<section className="w-full grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card
+          title="Memória Total"
+          value={`${(dockerSistemUsage.memory_usage / 1024 / 1024).toFixed(0)} MB / ${(dockerSistemUsage.memory_limit / 1024 / 1024 / 1024).toFixed(1)} GB`}
         />
-        <Card 
-          title="Rede RX Total" 
-          value={dockerSistemUsage.network_rx_bytes < 1024 * 1024 
-            ? `${(dockerSistemUsage.network_rx_bytes / 1024).toFixed(1)} KB` 
-            : `${(dockerSistemUsage.network_rx_bytes / 1024 / 1024).toFixed(1)} MB`} 
+        <Card
+          title="Rede RX Total"
+          value={dockerSistemUsage.network_rx_bytes < 1024 * 1024
+            ? `${(dockerSistemUsage.network_rx_bytes / 1024).toFixed(1)} KB`
+            : `${(dockerSistemUsage.network_rx_bytes / 1024 / 1024).toFixed(1)} MB`}
         />
-        <Card 
-          title="Rede TX Total" 
-          value={dockerSistemUsage.network_tx_bytes < 1024 * 1024 
-            ? `${(dockerSistemUsage.network_tx_bytes / 1024).toFixed(1)} KB` 
-            : `${(dockerSistemUsage.network_tx_bytes / 1024 / 1024).toFixed(1)} MB`} 
+        <Card
+          title="Rede TX Total"
+          value={dockerSistemUsage.network_tx_bytes < 1024 * 1024
+            ? `${(dockerSistemUsage.network_tx_bytes / 1024).toFixed(1)} KB`
+            : `${(dockerSistemUsage.network_tx_bytes / 1024 / 1024).toFixed(1)} MB`}
         />
-        <Card 
-          title="Disco I/O Total" 
-          value={`R: ${(dockerSistemUsage.block_read_bytes / 1024 / 1024).toFixed(0)} MB | W: ${(dockerSistemUsage.block_write_bytes / 1024 / 1024).toFixed(0)} MB`} 
+        <Card
+          title="Disco I/O Total"
+          value={`R: ${(dockerSistemUsage.block_read_bytes / 1024 / 1024).toFixed(0)} MB | W: ${(dockerSistemUsage.block_write_bytes / 1024 / 1024).toFixed(0)} MB`}
         />
-      </section>
+      </section>*/}
 
       <section className="w-full h-full flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-250px)] mb-10">
         <LineChartComponent
@@ -168,6 +214,32 @@ export function Dashboard() {
           color="#3b82f6"
           height={300}
           unit="%"
+          showGrid={true}
+          showTooltip={true}
+          showLegend={false}
+          maxDataPoints={60}
+        />
+
+        <LineChartComponent
+          data={memoryHistory}
+          dataKey="value"
+          title={`Memória RAM: ${dockerSistemUsage.memory_limit > 0 ? ((dockerSistemUsage.memory_usage / dockerSistemUsage.memory_limit) * 100).toFixed(2) : "0.00"}% | ${(dockerSistemUsage.memory_usage / 1024 / 1024).toFixed(0)} MB / ${(dockerSistemUsage.memory_limit / 1024 / 1024 / 1024).toFixed(1)} GB`}
+          color="#10b981"
+          height={300}
+          unit="%"
+          showGrid={true}
+          showTooltip={true}
+          showLegend={false}
+          maxDataPoints={60}
+        />
+
+        <LineChartComponent
+          data={networkHistory}
+          dataKey="value"
+          title={`Rede Total: ${((dockerSistemUsage.network_rx_bytes + dockerSistemUsage.network_tx_bytes) / 1024 / 1024).toFixed(2)} MB | RX: ${(dockerSistemUsage.network_rx_bytes / 1024 / 1024).toFixed(1)} MB | TX: ${(dockerSistemUsage.network_tx_bytes / 1024 / 1024).toFixed(1)} MB`}
+          color="#f59e0b"
+          height={300}
+          unit="MB"
           showGrid={true}
           showTooltip={true}
           showLegend={false}
