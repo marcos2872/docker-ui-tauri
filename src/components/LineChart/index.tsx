@@ -1,14 +1,5 @@
 import React from "react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { Chart } from "react-google-charts";
 
 interface DataPoint {
   time: string;
@@ -29,96 +20,88 @@ interface LineChartComponentProps {
   maxDataPoints?: number;
 }
 
-const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(({
-  data,
-  dataKey,
-  title = "Chart",
-  color = "#8884d8",
-  height = 250,
-  showGrid = true,
-  showTooltip = true,
-  showLegend = true,
-  unit = "",
-  maxDataPoints = 60,
-}) => {
-  const formatTooltipValue = (value: any) => {
-    if (typeof value === "number") {
-      return `${value}${unit}`;
-    }
-    return value;
-  };
+const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
+  ({
+    data,
+    dataKey,
+    title = "Chart",
+    color = "#8884d8",
+    height = 250,
+    showGrid = true,
+    showTooltip = true,
+    showLegend = true,
+    unit = "",
+    maxDataPoints = 60,
+  }) => {
+    const chartData = React.useMemo(() => {
+      const limitedData = data.slice(-maxDataPoints);
 
-  const formatYAxisLabel = (value: any) => {
-    if (typeof value === "number") {
-      return `${value}${unit}`;
-    }
-    return value;
-  };
+      const headers = ["Time", dataKey];
+      const rows = limitedData.map((item) => [item.time, item.value]);
 
-  const formatXAxisLabel = (value: string) => {
-    const parts = value.split(":");
-    if (parts.length >= 2) {
-      return `${parts[0]}:${parts[1]}:${parts[2]}`;
-    }
-    return value;
-  };
+      return [headers, ...rows];
+    }, [data, maxDataPoints, dataKey]);
 
-  // Use data directly to avoid unnecessary re-renders and flicker
-  const chartData = React.useMemo(() => {
-    return data.slice(-maxDataPoints);
-  }, [data, maxDataPoints]);
+    const options = React.useMemo(
+      () => ({
+        title: title || undefined,
+        titleTextStyle: {
+          color: "#ffffff",
+          fontSize: 16,
+          bold: true,
+        },
+        backgroundColor: "transparent",
+        chartArea: {
+          backgroundColor: "transparent",
+          width: "90%",
+          height: "70%",
+        },
+        hAxis: {
+          textStyle: { color: "#ffffff", fontSize: 11 },
+          titleTextStyle: { color: "#ffffff" },
+          gridlines: { color: showGrid ? "#555555" : "transparent" },
+          minorGridlines: { color: "transparent" },
+        },
+        vAxis: {
+          textStyle: { color: "#ffffff", fontSize: 11 },
+          titleTextStyle: { color: "#ffffff" },
+          format: unit ? `#${unit}` : undefined,
+          gridlines: { color: showGrid ? "#555555" : "transparent" },
+          minorGridlines: { color: "transparent" },
+        },
+        legend: {
+          position: showLegend ? "bottom" : "none",
+          textStyle: { color: "#ffffff" },
+        },
+        colors: [color],
+        lineWidth: 2,
+        pointSize: 0,
+        tooltip: {
+          isHtml: showTooltip,
+          textStyle: { color: "#333333" },
+        },
+        animation: {
+          duration: 0,
+          startup: false,
+        },
+      }),
+      [title, showGrid, showLegend, showTooltip, color, unit],
+    );
 
-  return (
-    <div className="w-full flex flex-col bg-gray-700 rounded-md p-4">
-      {title && <h3 className="text-lg font-semibold mb-4">{title}</h3>}
-      <ResponsiveContainer width="100%" height={height}>
-        <LineChart
+    return (
+      <div className="w-full flex flex-col bg-gray-700 rounded-md p-4">
+        <Chart
+          chartType="LineChart"
+          width="100%"
+          height={`${height}px`}
           data={chartData}
-          margin={{
-            top: 5,
-            bottom: 5,
-            left: -20,
-            right: 5,
-          }}
-          isAnimationActive={false}
-        >
-          {showGrid && <CartesianGrid strokeDasharray="3 3" />}
-          <XAxis
-            dataKey="time"
-            tickFormatter={formatXAxisLabel}
-            fontSize={12}
-            angle={-45}
-            textAnchor="end"
-            height={60}
-          />
-          <YAxis tickFormatter={formatYAxisLabel} fontSize={12} />
-          {showTooltip && (
-            <Tooltip
-              formatter={(value) => [formatTooltipValue(value), dataKey]}
-              labelStyle={{ color: "#333" }}
-              contentStyle={{
-                backgroundColor: "#f8f9fa",
-                border: "1px solid #dee2e6",
-                borderRadius: "4px",
-              }}
-            />
-          )}
-          {showLegend && <Legend />}
-          <Line
-            type="linear"
-            dataKey={dataKey}
-            stroke={color}
-            strokeWidth={2}
-            dot={false}
-            activeDot={false}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-});
+          options={options}
+        />
+      </div>
+    );
+  },
+);
 
-LineChartComponent.displayName = 'LineChartComponent';
+LineChartComponent.displayName = "LineChartComponent";
 
 export default LineChartComponent;

@@ -95,11 +95,11 @@ export function Dashboard() {
     getDockerStats();
     getDockerSistemUsage();
 
-    // Set up interval for real-time updates every 2 seconds
+    // Set up interval for real-time updates every 1 second
     intervalRef.current = setInterval(() => {
       getDockerSistemUsage();
       getDockerStats();
-    }, 2000);
+    }, 1000);
 
     // Cleanup interval on component unmount
     return () => {
