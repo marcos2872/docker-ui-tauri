@@ -13,7 +13,7 @@ export function NavBar() {
   }, []);
 
   return (
-    <div className="flex flex-col justify-between w-32 p-3 h-full bg-gray-900">
+    <div className="flex flex-col justify-between w-32 p-3 h-full bg-gray-900 rounded-bl-lg">
       <section className="flex flex-col items-start gap-6">
         <button
           className={`w-full h-8 ${screen == 0 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}

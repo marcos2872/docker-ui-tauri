@@ -153,7 +153,7 @@ export function Dashboard() {
   }, [getDockerSistemUsage, getDockerStats]);
 
   const Card = ({ title, value }: { title: string; value: string }) => (
-    <div className="min-w-40 flex flex-col justify-center items-center bg-gray-700 p-2 rounded-lg shadow-md text-white">
+    <div className="min-w-40 flex flex-col justify-center items-center bg-gray-700 p-2 rounded-lg text-white">
       <h2 className="text-sm font-bold">{title}</h2>
       <p className=" font-bold">{value}</p>
     </div>

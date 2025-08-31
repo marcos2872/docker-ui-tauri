@@ -110,7 +110,7 @@ const MultiLineChartComponent: React.FC<MultiLineChartComponentProps> =
       );
 
       return (
-        <div className="w-full flex flex-col bg-gray-700 rounded-md p-4">
+        <div className="w-full flex flex-col bg-gray-700 rounded-lg p-4">
           <Chart
             chartType="LineChart"
             width="100%"
