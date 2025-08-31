@@ -18,6 +18,8 @@ interface LineChartComponentProps {
   showLegend?: boolean;
   unit?: string;
   maxDataPoints?: number;
+  minValue?: number;
+  maxValue?: number;
 }
 
 const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
@@ -32,6 +34,8 @@ const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
     showLegend = true,
     unit = "",
     maxDataPoints = 60,
+    minValue,
+    maxValue,
   }) => {
     const chartData = React.useMemo(() => {
       const limitedData = data.slice(-maxDataPoints);
@@ -53,7 +57,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
         backgroundColor: "transparent",
         chartArea: {
           backgroundColor: "transparent",
-          width: "90%",
+          width: "88%",
           height: "70%",
         },
         hAxis: {
@@ -61,6 +65,8 @@ const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
           titleTextStyle: { color: "#ffffff" },
           gridlines: { color: showGrid ? "#555555" : "transparent" },
           minorGridlines: { color: "transparent" },
+          slantedText: true,
+          slantedTextAngle: 45,
         },
         vAxis: {
           textStyle: { color: "#ffffff", fontSize: 11 },
@@ -68,6 +74,8 @@ const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
           format: unit ? `#${unit}` : undefined,
           gridlines: { color: showGrid ? "#555555" : "transparent" },
           minorGridlines: { color: "transparent" },
+          minValue: minValue,
+          maxValue: maxValue,
         },
         legend: {
           position: showLegend ? "bottom" : "none",
@@ -85,7 +93,16 @@ const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
           startup: false,
         },
       }),
-      [title, showGrid, showLegend, showTooltip, color, unit],
+      [
+        title,
+        showGrid,
+        showLegend,
+        showTooltip,
+        color,
+        unit,
+        minValue,
+        maxValue,
+      ],
     );
 
     return (

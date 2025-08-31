@@ -12,7 +12,12 @@ Docker Tauri provides a modern desktop interface for managing Docker containers,
 - **Image Management**: List and manage Docker images
 - **Network Management**: View and manage Docker networks
 - **Volume Management**: Handle Docker volumes
-- **Real-time Monitoring**: Live container statistics and performance metrics
+- **Real-time Dashboard**: Live system statistics and performance metrics
+- **Advanced Monitoring Charts**:
+  - **CPU Usage**: Real-time CPU percentage with dynamic scaling based on available cores
+  - **Memory Usage**: RAM consumption in MB/GB with intelligent unit conversion
+  - **Network Traffic**: Dual-line charts showing RX/TX separately with auto-scaling units (KB/MB/GB)
+- **Dynamic Scaling**: All charts automatically adjust their scales based on historical data
 - **Cross-platform**: Available for Windows, macOS, and Linux
 
 ## Tech Stack
@@ -21,7 +26,7 @@ Docker Tauri provides a modern desktop interface for managing Docker containers,
 - **React 19** - UI framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
-- **Recharts** - Data visualization
+- **React Google Charts** - Real-time data visualization and monitoring charts
 - **Vite** - Build tool
 
 ### Backend
@@ -90,9 +95,10 @@ The built application will be available in the `src-tauri/target/release/bundle/
 docker-tauri/
 ├── src/                    # React frontend
 │   ├── components/         # React components
-│   │   ├── dashboard/      # Main dashboard
+│   │   ├── dashboard/      # Main dashboard with real-time monitoring
 │   │   ├── header/         # Application header
-│   │   └── LineChart/      # Chart component
+│   │   ├── LineChart/      # Single-line chart component
+│   │   └── MultiLineChart/ # Multi-line chart component (network RX/TX)
 │   ├── App.tsx            # Main App component
 │   └── main.tsx           # Entry point
 ├── src-tauri/             # Rust backend
@@ -105,6 +111,37 @@ docker-tauri/
 ├── public/                # Static assets
 └── package.json           # Node.js dependencies
 ```
+
+## Features Details
+
+### Real-time Monitoring Dashboard
+
+The application provides comprehensive real-time monitoring with:
+
+#### CPU Monitoring
+- Real-time CPU usage percentage
+- Dynamic scaling based on CPU core count (never exceeds cores × 100%)
+- Historical data with 60-point rolling window
+- Automatic 10% headroom above peak usage for better visualization
+
+#### Memory Monitoring
+- RAM usage displayed in absolute values (MB/GB)
+- Intelligent unit conversion (MB for smaller values, GB for larger)
+- Percentage calculation with total system memory
+- Dynamic scaling based on system memory limits
+
+#### Network Monitoring  
+- Dual-line visualization for RX (receive) and TX (transmit)
+- Automatic unit scaling (KB/MB/GB) based on traffic volume
+- Color-coded lines: Green for RX, Orange for TX
+- Real-time total, RX, and TX values in chart title
+
+### Chart Features
+- **Auto-scaling Y-axis**: All charts automatically adjust their maximum values
+- **45° rotated time labels**: Prevents overlap of time stamps
+- **Dark theme**: Optimized for Docker desktop environments
+- **Responsive design**: Charts adapt to window size changes
+- **Historical tracking**: 60 seconds of historical data retained
 
 ## Contributing
 
