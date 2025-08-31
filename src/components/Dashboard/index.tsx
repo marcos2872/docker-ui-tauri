@@ -153,7 +153,7 @@ export function Dashboard() {
   }, [getDockerSistemUsage, getDockerStats]);
 
   const Card = ({ title, value }: { title: string; value: string }) => (
-    <div className="min-w-40 flex flex-col justify-center items-center bg-gray-700 p-2 rounded-lg shadow-md">
+    <div className="min-w-40 flex flex-col justify-center items-center bg-gray-700 p-2 rounded-lg shadow-md text-white">
       <h2 className="text-sm font-bold">{title}</h2>
       <p className=" font-bold">{value}</p>
     </div>
@@ -262,9 +262,9 @@ export function Dashboard() {
     if (bytes >= 1024 * 1024 * 1024) {
       return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
     } else if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     } else {
-      return `${(bytes / 1024).toFixed(0)} KB`;
+      return `${(bytes / 1024).toFixed(2)} KB`;
     }
   };
 
@@ -296,7 +296,7 @@ export function Dashboard() {
         />
       </section>
 
-      <section className="w-full h-full flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-250px)] mb-10">
+      <section className="w-full h-full flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-282px)] mb-10">
         <LineChartComponent
           data={cpuHistory}
           dataKey="value"

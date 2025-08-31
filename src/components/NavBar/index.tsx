@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
-export function Header() {
+export function NavBar() {
   const [screen, setScreen] = useState(0);
   const [status, setStatus] = useState("");
 
@@ -13,7 +13,7 @@ export function Header() {
   }, []);
 
   return (
-    <div className="flex flex-col justify-between w-32 p-3 h-screen bg-gray-900 border-r-1 border-r-gray-600">
+    <div className="flex flex-col justify-between w-32 p-3 h-full bg-gray-900">
       <section className="flex flex-col items-start gap-6">
         <button
           className={`w-full h-8 ${screen == 0 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
