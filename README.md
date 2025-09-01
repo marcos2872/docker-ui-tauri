@@ -26,7 +26,11 @@ Docker Tauri provides a modern desktop interface for managing Docker containers,
 - **React 19** - UI framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
+- **@tailwindcss/vite** - Tailwind CSS integration with Vite
 - **React Google Charts** - Real-time data visualization and monitoring charts
+- **React Icons** - A collection of popular icons
+- **@tauri-apps/api** - Tauri API for interacting with the backend
+- **@tauri-apps/plugin-opener** - Tauri plugin for opening links in the default browser
 - **Vite** - Build tool
 
 ### Backend
@@ -83,33 +87,61 @@ The built application will be available in the `src-tauri/target/release/bundle/
 
 ## Scripts
 
-- `pnpm dev` - Start Vite development server
-- `pnpm build` - Build the React application
-- `pnpm preview` - Preview the built application
-- `pnpm tauri dev` - Start Tauri development mode
-- `pnpm tauri build` - Build the Tauri application
+- `pnpm run dev` - Start Vite development server
+- `pnpm run build` - Build the React application
+- `pnpm run preview` - Preview the built application
+- `pnpm run tauri dev` - Start Tauri development mode
+- `pnpm run tauri build` - Build the Tauri application
 
 ## Project Structure
 
 ```
 docker-tauri/
-├── src/                    # React frontend
-│   ├── components/         # React components
-│   │   ├── dashboard/      # Main dashboard with real-time monitoring
-│   │   ├── header/         # Application header
-│   │   ├── LineChart/      # Single-line chart component
-│   │   └── MultiLineChart/ # Multi-line chart component (network RX/TX)
-│   ├── App.tsx            # Main App component
-│   └── main.tsx           # Entry point
-├── src-tauri/             # Rust backend
+├── src/
+│   ├── components/
+│   │   ├── CreateContainerModal/
+│   │   ├── Header/
+│   │   ├── LineChart/
+│   │   ├── MultiLineChart/
+│   │   ├── NavBar/
+│   │   └── Toast/
+│   ├── contexts/
+│   │   └── MonitoringContext.tsx
+│   ├── screens/
+│   │   ├── Containers/
+│   │   ├── Dashboard/
+│   │   ├── Images/
+│   │   ├── Networks/
+│   │   ├── Servers/
+│   │   └── Volumes/
+│   ├── App.css
+│   ├── App.tsx
+│   ├── main.tsx
+│   └── vite-env.d.ts
+├── src-tauri/
 │   ├── src/
-│   │   ├── docker.rs      # Docker API integration
-│   │   ├── lib.rs         # Library entry point
-│   │   └── main.rs        # Application entry point
-│   ├── Cargo.toml         # Rust dependencies
-│   └── tauri.conf.json    # Tauri configuration
-├── public/                # Static assets
-└── package.json           # Node.js dependencies
+│   │   ├── docker.rs
+│   │   ├── lib.rs
+│   │   └── main.rs
+│   ├── capabilities/
+│   ├── gen/
+│   ├── icons/
+│   ├── .gitignore
+│   ├── build.rs
+│   ├── Cargo.lock
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── public/
+│   ├── tauri.svg
+│   └── vite.svg
+├── .gitignore
+├── index.html
+├── package.json
+├── pnpm-lock.yaml
+├── README.md
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts
 ```
 
 ## Features Details
@@ -130,7 +162,7 @@ The application provides comprehensive real-time monitoring with:
 - Percentage calculation with total system memory
 - Dynamic scaling based on system memory limits
 
-#### Network Monitoring  
+#### Network Monitoring
 - Dual-line visualization for RX (receive) and TX (transmit)
 - Automatic unit scaling (KB/MB/GB) based on traffic volume
 - Color-coded lines: Green for RX, Orange for TX
