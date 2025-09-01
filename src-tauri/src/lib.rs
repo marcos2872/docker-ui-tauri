@@ -1,22 +1,26 @@
-use crate::docker::{DockerInfo, DockerManager, DockerSystemUsage};
-use tokio::sync::Mutex;
+use crate::docker::{
+    ContainerInfo, CreateContainerRequest, DockerInfo, DockerManager, DockerSystemUsage,
+};
 use tauri::State;
+use tokio::sync::Mutex;
 
 mod docker;
 
 // Global Docker Manager para manter cache entre chamadas
 type DockerManagerState = Mutex<Option<DockerManager>>;
 
-async fn get_docker_manager(state: &State<'_, DockerManagerState>) -> Result<DockerManager, String> {
+async fn get_docker_manager(
+    state: &State<'_, DockerManagerState>,
+) -> Result<DockerManager, String> {
     let mut manager_guard = state.lock().await;
-    
+
     if manager_guard.is_none() {
         match DockerManager::new().await {
             Ok(manager) => *manager_guard = Some(manager),
             Err(e) => return Err(e.to_string()),
         }
     }
-    
+
     Ok(manager_guard.take().unwrap())
 }
 
@@ -49,12 +53,139 @@ async fn docker_infos(state: State<'_, DockerManagerState>) -> Result<DockerInfo
 }
 
 #[tauri::command]
-async fn docker_system_usage(state: State<'_, DockerManagerState>) -> Result<DockerSystemUsage, String> {
+async fn docker_system_usage(
+    state: State<'_, DockerManagerState>,
+) -> Result<DockerSystemUsage, String> {
     let mut manager = get_docker_manager(&state).await?;
     match manager.get_docker_system_usage().await {
         Ok(infos) => {
             set_docker_manager(&state, manager).await;
             Ok(infos)
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_list_containers(
+    state: State<'_, DockerManagerState>,
+) -> Result<Vec<ContainerInfo>, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.list_containers().await {
+        Ok(containers) => {
+            set_docker_manager(&state, manager).await;
+            Ok(containers)
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_start_container(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.start_container(&container_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Container started successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_stop_container(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.stop_container(&container_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Container stopped successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_pause_container(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.pause_container(&container_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Container paused successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_unpause_container(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.unpause_container(&container_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Container unpaused successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_remove_container(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.remove_container(&container_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Container removed successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_create_container(
+    state: State<'_, DockerManagerState>,
+    request: CreateContainerRequest,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.create_container(request).await {
+        Ok(container_id) => {
+            set_docker_manager(&state, manager).await;
+            Ok(container_id)
         }
         Err(e) => {
             set_docker_manager(&state, manager).await;
@@ -71,7 +202,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             docker_status,
             docker_infos,
-            docker_system_usage
+            docker_system_usage,
+            docker_list_containers,
+            docker_start_container,
+            docker_stop_container,
+            docker_pause_container,
+            docker_unpause_container,
+            docker_remove_container,
+            docker_create_container
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

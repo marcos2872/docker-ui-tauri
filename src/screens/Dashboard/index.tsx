@@ -1,7 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState, useRef, useMemo } from "react";
+import { useCallback, useEffect, useState } from "react";
 import LineChartComponent from "../../components/LineChart";
 import MultiLineChartComponent from "../../components/MultiLineChart";
+import {
+  useMonitoring,
+  useMonitoringStats,
+} from "../../contexts/MonitoringContext";
 
 interface DockerInfo {
   version: string;
@@ -11,33 +15,6 @@ interface DockerInfo {
   containers_stopped: number;
   images: number;
   architecture: string;
-}
-
-interface DockerSystemUsage {
-  cpu_online: number;
-  cpu_usage: number;
-  memory_usage: number;
-  memory_limit: number;
-  network_rx_bytes: number;
-  network_tx_bytes: number;
-  block_read_bytes: number;
-  block_write_bytes: number;
-}
-
-interface CpuDataPoint {
-  time: string;
-  value: number;
-}
-
-interface MemoryDataPoint {
-  time: string;
-  value: number;
-}
-
-interface NetworkDataPoint {
-  time: string;
-  rx: number;
-  tx: number;
 }
 
 export function Dashboard() {
@@ -51,104 +28,49 @@ export function Dashboard() {
     architecture: "",
   });
 
-  const [dockerSistemUsage, setDockerSistemUsage] = useState<DockerSystemUsage>(
-    {
-      cpu_online: 0,
-      cpu_usage: 0,
-      memory_usage: 0,
-      memory_limit: 0,
-      network_rx_bytes: 0,
-      network_tx_bytes: 0,
-      block_read_bytes: 0,
-      block_write_bytes: 0,
-    },
-  );
+  const {
+    currentSystemUsage,
+    isMonitoring,
+    dataPointsCount,
+    lastUpdate,
+    startMonitoring,
+    stopMonitoring,
+    clearHistory,
+  } = useMonitoring();
 
-  const [cpuHistory, setCpuHistory] = useState<CpuDataPoint[]>([]);
-  const [memoryHistory, setMemoryHistory] = useState<MemoryDataPoint[]>([]);
-  const [networkHistory, setNetworkHistory] = useState<NetworkDataPoint[]>([]);
-  const intervalRef = useRef<number | null>(null);
+  const {
+    cpuHistory,
+    memoryHistory,
+    cpuMaxValue,
+    memoryMaxValue,
+    networkConfig,
+    cpuTitle,
+    memoryTitle,
+    networkTitle,
+  } = useMonitoringStats();
 
-  const getDockerSistemUsage = useCallback(async () => {
+  const getDockerStats = useCallback(async () => {
     try {
-      const sistemUsage = (await invoke(
-        "docker_system_usage",
-      )) as DockerSystemUsage;
-      setDockerSistemUsage(sistemUsage);
-
-      // Add CPU data to history
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-
-      setCpuHistory((prev) => {
-        const cpuPercentage = sistemUsage.cpu_usage;
-        const newHistory = [
-          ...prev,
-          {
-            time: timeStr,
-            value: cpuPercentage,
-          },
-        ];
-
-        return newHistory.slice(-60);
-      });
-
-      // Add Memory data to history (in MB)
-      setMemoryHistory((prev) => {
-        const memoryUsageMB = sistemUsage.memory_usage / 1024 / 1024;
-        const newHistory = [
-          ...prev,
-          {
-            time: timeStr,
-            value: memoryUsageMB,
-          },
-        ];
-
-        return newHistory.slice(-60);
-      });
-
-      // Add Network data to history (RX and TX separate in bytes)
-      setNetworkHistory((prev) => {
-        const newHistory = [
-          ...prev,
-          {
-            time: timeStr,
-            rx: sistemUsage.network_rx_bytes,
-            tx: sistemUsage.network_tx_bytes,
-          },
-        ];
-
-        return newHistory.slice(-60);
-      });
+      const status = (await invoke("docker_infos")) as DockerInfo;
+      setDockerInfo(status);
     } catch (error) {
-      console.error("Error fetching system usage:", error);
+      console.error("Error fetching docker stats:", error);
     }
   }, []);
 
-  const getDockerStats = useCallback(async () => {
-    const status = (await invoke("docker_infos")) as DockerInfo;
-    setDockerInfo(status);
-  }, []);
-
+  // Start monitoring when component mounts
   useEffect(() => {
     getDockerStats();
-    getDockerSistemUsage();
+    startMonitoring();
 
-    intervalRef.current = setInterval(() => {
-      getDockerSistemUsage();
-      getDockerStats();
-    }, 1000);
+    // Set up interval for docker stats (less frequent than system usage)
+    const statsInterval = setInterval(getDockerStats, 5000);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
+      clearInterval(statsInterval);
+      // Don't stop monitoring when component unmounts - keep it running
     };
-  }, [getDockerSistemUsage, getDockerStats]);
+  }, [getDockerStats, startMonitoring]);
 
   const Card = ({ title, value }: { title: string; value: string }) => (
     <div className="min-w-40 flex flex-col justify-center items-center bg-gray-700 p-2 rounded-lg text-white">
@@ -157,122 +79,67 @@ export function Dashboard() {
     </div>
   );
 
-  const cpuMaxValue = useMemo(() => {
-    const cpuOnlineMax = dockerSistemUsage.cpu_online * 100;
-
-    if (cpuHistory.length === 0) {
-      return Math.min(100, cpuOnlineMax);
-    }
-
-    const historyMax = Math.max(...cpuHistory.map((point) => point.value));
-    const maxValueWith10Percent = historyMax * 0.1;
-    const maxValue = Math.min(maxValueWith10Percent, cpuOnlineMax);
-
-    return Math.max(maxValue, 0.1);
-  }, [cpuHistory, dockerSistemUsage.cpu_online]);
-
-  const memoryMaxValue = useMemo(() => {
-    const memoryLimitMB = dockerSistemUsage.memory_limit / 1024 / 1024;
-
-    if (memoryHistory.length === 0) {
-      return memoryLimitMB > 0 ? memoryLimitMB : 1024;
-    }
-
-    const historyMax = Math.max(...memoryHistory.map((point) => point.value));
-    const maxValueWith10Percent = historyMax + historyMax * 0.1;
-    const maxValue = Math.min(maxValueWith10Percent, memoryLimitMB);
-
-    return Math.max(maxValue, 100);
-  }, [memoryHistory, dockerSistemUsage.memory_limit]);
-
-  const formatMemoryValue = (bytes: number, unit: "MB" | "GB" = "MB") => {
-    if (unit === "GB") {
-      return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-    }
-    return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
-  };
-
-  const getMemoryTitle = () => {
-    const usageInMB = dockerSistemUsage.memory_usage / 1024 / 1024;
-
-    const usageDisplay =
-      usageInMB > 1024
-        ? formatMemoryValue(dockerSistemUsage.memory_usage, "GB")
-        : formatMemoryValue(dockerSistemUsage.memory_usage, "MB");
-
-    const limitDisplay = formatMemoryValue(
-      dockerSistemUsage.memory_limit,
-      "GB",
-    );
-
-    return `Memória RAM: ${usageDisplay} / ${limitDisplay}`;
-  };
-
   const getMemoryUnit = () => {
-    const memoryLimitMB = dockerSistemUsage.memory_usage / 1024 / 1024;
+    const memoryLimitMB = currentSystemUsage.memory_usage / 1024 / 1024;
     return memoryLimitMB > 1024 ? "GB" : "MB";
-  };
-
-  const getNetworkUnit = () => {
-    if (networkHistory.length === 0) {
-      return { unit: "KB", divisor: 1024 };
-    }
-
-    const allValues = networkHistory.flatMap((point) => [point.rx, point.tx]);
-    const maxBytes = Math.max(...allValues);
-
-    if (maxBytes >= 1024 * 1024 * 1024) {
-      return { unit: "GB", divisor: 1024 * 1024 * 1024 };
-    } else if (maxBytes >= 1024 * 1024) {
-      return { unit: "MB", divisor: 1024 * 1024 };
-    } else {
-      return { unit: "KB", divisor: 1024 };
-    }
-  };
-
-  const networkConfig = useMemo(() => {
-    const { unit, divisor } = getNetworkUnit();
-
-    if (networkHistory.length === 0) {
-      return { unit, maxValue: 10, data: [] };
-    }
-
-    const convertedData = networkHistory.map((point) => ({
-      time: point.time,
-      rx: point.rx / divisor,
-      tx: point.tx / divisor,
-    }));
-
-    const allValues = convertedData.flatMap((point) => [point.rx, point.tx]);
-    const historyMax = Math.max(...allValues);
-    const maxValueWith10Percent = historyMax + historyMax * 0.1;
-    const maxValue = Math.max(
-      maxValueWith10Percent,
-      unit === "GB" ? 0.1 : unit === "MB" ? 1 : 10,
-    );
-
-    return { unit, maxValue, data: convertedData };
-  }, [networkHistory]);
-
-  const formatNetworkValue = (bytes: number) => {
-    if (bytes >= 1024 * 1024 * 1024) {
-      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-    } else if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    } else {
-      return `${(bytes / 1024).toFixed(2)} KB`;
-    }
-  };
-
-  const getNetworkTitle = () => {
-    const rx = formatNetworkValue(dockerSistemUsage.network_rx_bytes);
-    const tx = formatNetworkValue(dockerSistemUsage.network_tx_bytes);
-
-    return `Rede RX: ${rx} | TX: ${tx}`;
   };
 
   return (
     <div className="flex flex-col w-full p-4 justify-center gap-6">
+      {/* Header with Monitoring Controls */}
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+          {lastUpdate && (
+            <div className="flex items-center gap-4 text-sm text-gray-400">
+              <span>
+                Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
+              </span>
+              <span className="text-yellow-400">
+                {Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s atrás
+              </span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-4 text-sm text-gray-300">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full ${isMonitoring ? "bg-green-400 animate-pulse" : "bg-red-400"}`}
+              ></div>
+              <span>Monitoramento {isMonitoring ? "Ativo" : "Inativo"}</span>
+            </div>
+            {dataPointsCount > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-blue-400">{dataPointsCount} pontos</span>
+                <span className="text-xs bg-gray-700 px-2 py-1 rounded">
+                  {Math.floor(dataPointsCount / 60)}min de histórico
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={isMonitoring ? stopMonitoring : startMonitoring}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isMonitoring
+                  ? "bg-red-600 hover:bg-red-500 text-white"
+                  : "bg-green-600 hover:bg-green-500 text-white"
+              }`}
+            >
+              {isMonitoring ? "Parar" : "Iniciar"} Monitoramento
+            </button>
+            <button
+              onClick={clearHistory}
+              disabled={dataPointsCount === 0}
+              className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Limpar Histórico
+            </button>
+          </div>
+        </div>
+      </div>
+
       <section className="w-full grid grid-cols-3 gap-2 lg:grid-cols-5">
         <Card title="Version" value={dockerInfo.version} />
         <Card title="Architecture" value={dockerInfo.architecture} />
@@ -296,14 +163,14 @@ export function Dashboard() {
         <LineChartComponent
           data={cpuHistory}
           dataKey="value"
-          title={`CPU Total: ${dockerSistemUsage.cpu_usage.toFixed(2)}% | ${dockerSistemUsage.cpu_online} cores`}
+          title={cpuTitle}
           color="#3b82f6"
           height={300}
           unit="%"
           showGrid={true}
           showTooltip={true}
           showLegend={false}
-          maxDataPoints={60}
+          maxDataPoints={120}
           minValue={0}
           maxValue={cpuMaxValue}
         />
@@ -311,14 +178,14 @@ export function Dashboard() {
         <LineChartComponent
           data={memoryHistory}
           dataKey="value"
-          title={getMemoryTitle()}
+          title={memoryTitle}
           color="#10b981"
           height={300}
           unit={getMemoryUnit()}
           showGrid={true}
           showTooltip={true}
           showLegend={false}
-          maxDataPoints={60}
+          maxDataPoints={120}
           minValue={0}
           maxValue={memoryMaxValue}
         />
@@ -326,14 +193,14 @@ export function Dashboard() {
         <MultiLineChartComponent
           data={networkConfig.data}
           dataKeys={["rx", "tx"]}
-          title={getNetworkTitle()}
+          title={networkTitle}
           colors={["#10b981", "#f59e0b"]}
           height={300}
           unit={networkConfig.unit}
           showGrid={true}
           showTooltip={true}
           showLegend={true}
-          maxDataPoints={60}
+          maxDataPoints={120}
           minValue={0}
           maxValue={networkConfig.maxValue}
         />
