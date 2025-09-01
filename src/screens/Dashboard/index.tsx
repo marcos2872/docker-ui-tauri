@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
-import LineChartComponent from "../LineChart";
-import MultiLineChartComponent from "../MultiLineChart";
+import LineChartComponent from "../../components/LineChart";
+import MultiLineChartComponent from "../../components/MultiLineChart";
 
 interface DockerInfo {
   version: string;
@@ -138,13 +138,11 @@ export function Dashboard() {
     getDockerStats();
     getDockerSistemUsage();
 
-    // Set up interval for real-time updates every 1 second
     intervalRef.current = setInterval(() => {
       getDockerSistemUsage();
       getDockerStats();
     }, 1000);
 
-    // Cleanup interval on component unmount
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -170,7 +168,6 @@ export function Dashboard() {
     const maxValueWith10Percent = historyMax * 0.1;
     const maxValue = Math.min(maxValueWith10Percent, cpuOnlineMax);
 
-    // Garantir um valor mínimo para visualização
     return Math.max(maxValue, 0.1);
   }, [cpuHistory, dockerSistemUsage.cpu_online]);
 
@@ -185,7 +182,6 @@ export function Dashboard() {
     const maxValueWith10Percent = historyMax + historyMax * 0.1;
     const maxValue = Math.min(maxValueWith10Percent, memoryLimitMB);
 
-    // Garantir um valor mínimo para visualização
     return Math.max(maxValue, 100);
   }, [memoryHistory, dockerSistemUsage.memory_limit]);
 

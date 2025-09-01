@@ -1,8 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 
-export function NavBar() {
-  const [screen, setScreen] = useState(0);
+interface IProps {
+  changeScreen: (v: number) => void;
+  screen: number;
+}
+
+export function NavBar({ changeScreen, screen }: IProps) {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -18,7 +22,7 @@ export function NavBar() {
         <button
           className={`w-full h-8 ${screen == 0 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
           onClick={() => {
-            setScreen(0);
+            changeScreen(0);
           }}
         >
           <p className="text-sm text-gray-300">Docker</p>
@@ -26,7 +30,7 @@ export function NavBar() {
         <button
           className={`w-full h-8 ${screen == 1 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
           onClick={() => {
-            setScreen(1);
+            changeScreen(1);
           }}
         >
           <p className="text-sm text-gray-300">Containers</p>
@@ -34,7 +38,7 @@ export function NavBar() {
         <button
           className={`w-full h-8 ${screen == 2 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
           onClick={() => {
-            setScreen(2);
+            changeScreen(2);
           }}
         >
           <p className="text-sm text-gray-300">Images</p>
@@ -42,7 +46,7 @@ export function NavBar() {
         <button
           className={`w-full h-8 ${screen == 3 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
           onClick={() => {
-            setScreen(3);
+            changeScreen(3);
           }}
         >
           <p className="text-sm text-gray-300">Volumes</p>
@@ -50,7 +54,7 @@ export function NavBar() {
         <button
           className={`w-full h-8 ${screen == 4 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
           onClick={() => {
-            setScreen(4);
+            changeScreen(4);
           }}
         >
           <p className="text-sm text-gray-300">Networks</p>
@@ -58,7 +62,7 @@ export function NavBar() {
         <button
           className={`w-full h-8 ${screen == 5 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
           onClick={() => {
-            setScreen(5);
+            changeScreen(5);
           }}
         >
           <p className="text-sm text-gray-300">Servers</p>
