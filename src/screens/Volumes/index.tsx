@@ -51,10 +51,6 @@ export function Volumes() {
       return;
     }
 
-    if (!confirm(`Tem certeza que deseja remover o volume "${volumeName}"?`)) {
-      return;
-    }
-
     try {
       await invoke("docker_remove_volume", { volumeName });
       showSuccess("Volume removido com sucesso");

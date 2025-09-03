@@ -1,6 +1,6 @@
 use crate::docker::{
     ContainerInfo, CreateContainerRequest, DockerInfo, DockerManager, DockerSystemUsage, ImageInfo,
-    VolumeInfo,
+    NetworkInfo, VolumeInfo,
 };
 use tauri::State;
 use tokio::sync::Mutex;
@@ -302,6 +302,60 @@ async fn docker_create_volume(
     }
 }
 
+#[tauri::command]
+async fn docker_list_networks(
+    state: State<'_, DockerManagerState>,
+) -> Result<Vec<NetworkInfo>, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.list_networks().await {
+        Ok(networks) => {
+            set_docker_manager(&state, manager).await;
+            Ok(networks)
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_remove_network(
+    state: State<'_, DockerManagerState>,
+    network_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.remove_network(&network_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Network removed successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_create_network(
+    state: State<'_, DockerManagerState>,
+    network_name: String,
+    driver: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.create_network(&network_name, &driver).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Network created successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -323,7 +377,10 @@ pub fn run() {
             docker_pull_image,
             docker_list_volumes,
             docker_remove_volume,
-            docker_create_volume
+            docker_create_volume,
+            docker_list_networks,
+            docker_remove_network,
+            docker_create_network
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

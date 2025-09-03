@@ -493,6 +493,24 @@ impl DockerManager {
         Ok(())
     }
 
+    // Cria uma nova network
+    pub async fn create_network(&self, network_name: &str, driver: &str) -> Result<()> {
+        let output = Command::new("docker")
+            .args(&["network", "create", "--driver", driver, network_name])
+            .output()
+            .context("Failed to execute docker network create command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!(
+                "Não foi possível criar a network: {}",
+                stderr
+            ));
+        }
+
+        Ok(())
+    }
+
     // Lista todos os volumes de containers
     pub async fn list_volumes(&self) -> Result<Vec<VolumeInfo>> {
         let volumes = self
