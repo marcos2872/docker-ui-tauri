@@ -34,7 +34,7 @@ export function CreateNetworkModal({
     try {
       await invoke("docker_create_network", {
         networkName: networkName.trim(),
-        driver
+        driver,
       });
 
       onShowSuccess(`Network "${networkName}" criada com sucesso`);
@@ -59,7 +59,7 @@ export function CreateNetworkModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
       <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
           <h2 className="text-xl font-bold text-white">Criar Network</h2>
@@ -138,9 +138,12 @@ export function CreateNetworkModal({
             <div className="text-sm text-gray-400">
               <p>A network será criada e gerenciada pelo Docker.</p>
               <p className="mt-1">
-                <strong>Bridge:</strong> Padrão para containers no mesmo host<br/>
-                <strong>Overlay:</strong> Para containers em múltiplos hosts<br/>
-                <strong>Host:</strong> Remove isolamento de rede<br/>
+                <strong>Bridge:</strong> Padrão para containers no mesmo host
+                <br />
+                <strong>Overlay:</strong> Para containers em múltiplos hosts
+                <br />
+                <strong>Host:</strong> Remove isolamento de rede
+                <br />
                 <strong>None:</strong> Desabilita toda rede
               </p>
             </div>
