@@ -582,6 +582,24 @@ impl DockerManager {
         Ok(())
     }
 
+    // Cria um novo volume
+    pub async fn create_volume(&self, volume_name: &str, driver: &str) -> Result<()> {
+        let output = Command::new("docker")
+            .args(&["volume", "create", "--driver", driver, volume_name])
+            .output()
+            .context("Failed to execute docker volume create command")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow::anyhow!(
+                "Não foi possível criar o volume: {}",
+                stderr
+            ));
+        }
+
+        Ok(())
+    }
+
     // Para um container
     pub async fn stop_container(&self, container_name: &str) -> Result<()> {
         let output = Command::new("docker")

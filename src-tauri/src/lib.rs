@@ -1,5 +1,6 @@
 use crate::docker::{
     ContainerInfo, CreateContainerRequest, DockerInfo, DockerManager, DockerSystemUsage, ImageInfo,
+    VolumeInfo,
 };
 use tauri::State;
 use tokio::sync::Mutex;
@@ -247,6 +248,60 @@ async fn docker_pull_image(
     }
 }
 
+#[tauri::command]
+async fn docker_list_volumes(
+    state: State<'_, DockerManagerState>,
+) -> Result<Vec<VolumeInfo>, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.list_volumes().await {
+        Ok(volumes) => {
+            set_docker_manager(&state, manager).await;
+            Ok(volumes)
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_remove_volume(
+    state: State<'_, DockerManagerState>,
+    volume_name: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.remove_volume(&volume_name).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Volume removed successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn docker_create_volume(
+    state: State<'_, DockerManagerState>,
+    volume_name: String,
+    driver: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.create_volume(&volume_name, &driver).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Volume created successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -265,7 +320,10 @@ pub fn run() {
             docker_create_container,
             docker_list_images,
             docker_remove_image,
-            docker_pull_image
+            docker_pull_image,
+            docker_list_volumes,
+            docker_remove_volume,
+            docker_create_volume
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
