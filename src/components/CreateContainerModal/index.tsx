@@ -213,7 +213,7 @@ export function CreateContainerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-gray-800 border-b border-gray-700 p-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-white">Criar Container</h2>
@@ -306,14 +306,34 @@ export function CreateContainerModal({
                 onChange={(e) =>
                   setFormData({ ...formData, restart_policy: e.target.value })
                 }
-                className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none appearance-none"
+                style={{
+                  backgroundColor: "#364153",
+                  color: "#ffffff",
+                }}
               >
-                <option value="no">Nunca reiniciar</option>
-                <option value="always">Sempre reiniciar</option>
-                <option value="unless-stopped">
+                <option
+                  value="no"
+                  style={{ backgroundColor: "#364153", color: "#ffffff" }}
+                >
+                  Nunca reiniciar
+                </option>
+                <option
+                  value="always"
+                  style={{ backgroundColor: "#364153", color: "#ffffff" }}
+                >
+                  Sempre reiniciar
+                </option>
+                <option
+                  value="unless-stopped"
+                  style={{ backgroundColor: "#364153", color: "#ffffff" }}
+                >
                   Reiniciar a menos que parado manualmente
                 </option>
-                <option value="on-failure">
+                <option
+                  value="on-failure"
+                  style={{ backgroundColor: "#364153", color: "#ffffff" }}
+                >
                   Reiniciar apenas em caso de falha
                 </option>
               </select>
@@ -374,10 +394,24 @@ export function CreateContainerModal({
                   onChange={(e) =>
                     setNewPort({ ...newPort, protocol: e.target.value })
                   }
-                  className="px-2 py-1 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                  className="px-2 py-1 bg-gray-700 text-white rounded border border-gray-600 focus:border-blue-500 focus:outline-none appearance-none"
+                  style={{
+                    backgroundColor: "#374151",
+                    color: "#ffffff",
+                  }}
                 >
-                  <option value="tcp">TCP</option>
-                  <option value="udp">UDP</option>
+                  <option
+                    value="tcp"
+                    style={{ backgroundColor: "#374151", color: "#ffffff" }}
+                  >
+                    TCP
+                  </option>
+                  <option
+                    value="udp"
+                    style={{ backgroundColor: "#374151", color: "#ffffff" }}
+                  >
+                    UDP
+                  </option>
                 </select>
                 <button
                   type="button"
@@ -447,7 +481,12 @@ export function CreateContainerModal({
                         read_only: e.target.checked,
                       })
                     }
-                    className="rounded"
+                    className="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+                    style={{
+                      backgroundColor: "#374151",
+                      borderColor: "#4B5563",
+                      accentColor: "#3B82F6",
+                    }}
                   />
                   RO
                 </label>
