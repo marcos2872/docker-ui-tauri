@@ -35,9 +35,11 @@ pub struct ContainerInfo {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImageInfo {
     pub id: String,
-    pub tags: Vec<String>,
+    pub repository: String,
+    pub tag: String,
     pub created: i64,
     pub size: i64,
+    pub containers: i64,
     pub in_use: bool,
 }
 
@@ -340,22 +342,32 @@ impl DockerManager {
             .into_iter()
             .map(|image: ImageSummary| {
                 let in_use = image.containers > 0;
+                let (repository, tag) = if let Some(first_tag) = image.repo_tags.first() {
+                    if let Some(colon_pos) = first_tag.rfind(':') {
+                        let repo = first_tag[..colon_pos].to_string();
+                        let tag = first_tag[colon_pos + 1..].to_string();
+                        (repo, tag)
+                    } else {
+                        (first_tag.clone(), "latest".to_string())
+                    }
+                } else {
+                    ("<none>".to_string(), "<none>".to_string())
+                };
+
                 ImageInfo {
                     id: image.id.clone(),
-                    tags: image.repo_tags.clone(),
+                    repository,
+                    tag,
                     created: image.created,
                     size: image.size,
+                    containers: image.containers,
                     in_use,
                 }
             })
             .collect();
 
-        // Ordena por nome da primeira tag para manter ordem consistente
-        image_infos.sort_by(|a, b| {
-            let tag_a = a.tags.get(0).cloned().unwrap_or_default();
-            let tag_b = b.tags.get(0).cloned().unwrap_or_default();
-            tag_a.cmp(&tag_b)
-        });
+        // Ordena por nome do repositório para manter ordem consistente
+        image_infos.sort_by(|a, b| a.repository.cmp(&b.repository));
 
         Ok(image_infos)
     }
@@ -796,28 +808,36 @@ impl DockerManager {
             ) {
                 let cpu_total = cpu_usage.total_usage.unwrap_or(0);
                 let system_total = cpu_stats.system_cpu_usage.unwrap_or(0);
-                
+
                 // Verifica se temos cache anterior e se tempo suficiente passou
-                let (cpu_delta, system_delta) = if let Some(prev_stats) = self.previous_stats.get(container_id) {
-                    let time_elapsed = current_time.saturating_sub(prev_stats.timestamp);
-                    
-                    if time_elapsed >= MIN_CPU_INTERVAL {
-                        // Usa cache anterior se tempo suficiente passou
-                        let cache_cpu_delta = cpu_total.saturating_sub(prev_stats.cpu_total);
-                        let cache_system_delta = system_total.saturating_sub(prev_stats.system_total);
-                        (cache_cpu_delta, cache_system_delta)
+                let (cpu_delta, system_delta) =
+                    if let Some(prev_stats) = self.previous_stats.get(container_id) {
+                        let time_elapsed = current_time.saturating_sub(prev_stats.timestamp);
+
+                        if time_elapsed >= MIN_CPU_INTERVAL {
+                            // Usa cache anterior se tempo suficiente passou
+                            let cache_cpu_delta = cpu_total.saturating_sub(prev_stats.cpu_total);
+                            let cache_system_delta =
+                                system_total.saturating_sub(prev_stats.system_total);
+                            (cache_cpu_delta, cache_system_delta)
+                        } else {
+                            // Fallback para precpu_stats se muito pouco tempo passou
+                            let cpu_total_prev = precpu_usage.total_usage.unwrap_or(0);
+                            let system_total_prev = precpu_stats.system_cpu_usage.unwrap_or(0);
+                            (
+                                cpu_total.saturating_sub(cpu_total_prev),
+                                system_total.saturating_sub(system_total_prev),
+                            )
+                        }
                     } else {
-                        // Fallback para precpu_stats se muito pouco tempo passou
+                        // Primeira vez - usa precpu_stats
                         let cpu_total_prev = precpu_usage.total_usage.unwrap_or(0);
                         let system_total_prev = precpu_stats.system_cpu_usage.unwrap_or(0);
-                        (cpu_total.saturating_sub(cpu_total_prev), system_total.saturating_sub(system_total_prev))
-                    }
-                } else {
-                    // Primeira vez - usa precpu_stats
-                    let cpu_total_prev = precpu_usage.total_usage.unwrap_or(0);
-                    let system_total_prev = precpu_stats.system_cpu_usage.unwrap_or(0);
-                    (cpu_total.saturating_sub(cpu_total_prev), system_total.saturating_sub(system_total_prev))
-                };
+                        (
+                            cpu_total.saturating_sub(cpu_total_prev),
+                            system_total.saturating_sub(system_total_prev),
+                        )
+                    };
 
                 // Atualiza cache para próxima iteração
                 let (network_rx, network_tx) = self.get_network_stats(stats);
@@ -1252,14 +1272,17 @@ impl DockerManager {
     async fn image_exists(&self, image_name: &str) -> Result<bool> {
         let images = self.list_images().await?;
         Ok(images.iter().any(|img| {
-            img.tags
-                .iter()
-                .any(|tag| tag == image_name || tag.starts_with(&format!("{}:", image_name)))
+            let full_name = if img.tag == "latest" {
+                img.repository.clone()
+            } else {
+                format!("{}:{}", img.repository, img.tag)
+            };
+            full_name == image_name || img.repository == image_name
         }))
     }
 
     // Faz pull de uma imagem
-    async fn pull_image(&self, image_name: &str) -> Result<()> {
+    pub async fn pull_image(&self, image_name: &str) -> Result<()> {
         use bollard::query_parameters::CreateImageOptions;
         use futures_util::StreamExt;
 
