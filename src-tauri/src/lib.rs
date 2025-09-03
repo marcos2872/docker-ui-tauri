@@ -356,6 +356,58 @@ async fn docker_create_network(
     }
 }
 
+#[tauri::command]
+async fn test_ssh_connection(
+    host: String,
+    port: u16,
+    user: String,
+    password: String,
+) -> Result<String, String> {
+    // Simulate SSH connection test
+    // In a real implementation, you would use an SSH library like ssh2
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
+    // For demonstration, we'll just validate the inputs
+    if host.is_empty() || user.is_empty() || password.is_empty() {
+        return Err("Invalid connection parameters".to_string());
+    }
+
+    // Simulate connection success/failure based on host
+    if host.contains("invalid") || host.contains("error") {
+        return Err("Connection failed: Host unreachable".to_string());
+    }
+
+    Ok(format!("Connection successful to {}:{}", host, port))
+}
+
+#[tauri::command]
+async fn connect_to_server(
+    host: String,
+    port: u16,
+    user: String,
+    password: String,
+) -> Result<String, String> {
+    // Simulate establishing SSH connection
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+    // In a real implementation, this would establish and maintain an SSH connection
+    // For now, we'll just simulate success using the password parameter
+    if password.is_empty() {
+        return Err("Password is required".to_string());
+    }
+
+    Ok(format!("Connected to {}@{}:{}", user, host, port))
+}
+
+#[tauri::command]
+async fn disconnect_from_server() -> Result<String, String> {
+    // Simulate disconnecting from SSH server
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // In a real implementation, this would close the SSH connection
+    Ok("Disconnected successfully".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -380,7 +432,10 @@ pub fn run() {
             docker_create_volume,
             docker_list_networks,
             docker_remove_network,
-            docker_create_network
+            docker_create_network,
+            test_ssh_connection,
+            connect_to_server,
+            disconnect_from_server
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
