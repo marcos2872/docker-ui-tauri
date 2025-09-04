@@ -367,19 +367,11 @@ impl SshClient {
     pub async fn add_saved_connection(&self, connection: SavedSshConnection) -> Result<(), String> {
         let mut saved_connections = self.saved_connections.lock().await;
 
-        // Verificar se já existe uma conexão com o mesmo host, porta e usuário
-        let exists = saved_connections.iter().any(|conn| {
-            conn.host == connection.host
-                && conn.port == connection.port
-                && conn.username == connection.username
-        });
+        // Sempre adicionar nova conexão (sem verificação de duplicatas)
+        saved_connections.push(connection);
 
-        if !exists {
-            saved_connections.push(connection);
-            drop(saved_connections);
-            self.save_connections().await?;
-        }
-
+        drop(saved_connections);
+        self.save_connections().await?;
         Ok(())
     }
 
