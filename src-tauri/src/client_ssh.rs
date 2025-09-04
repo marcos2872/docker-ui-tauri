@@ -107,6 +107,37 @@ impl SshClient {
             .as_secs()
     }
 
+    pub async fn create_connection(&self, request: SshConnectionRequest) -> Result<String, String> {
+        // Test connection first to validate credentials
+        self.test_connection(&request).await?;
+
+        let connection_id = format!("{}@{}:{}", request.username, request.host, request.port);
+        let current_time = Self::current_timestamp();
+
+        // Create connection info
+        let connection_info = SshConnectionInfo {
+            host: request.host.clone(),
+            port: request.port,
+            username: request.username.clone(),
+            connection_id: connection_id.clone(),
+            connected_at: current_time,
+            last_activity: current_time,
+        };
+
+        // Create connection struct (without actual SSH session for now)
+        let connection = SshConnection {
+            info: connection_info,
+            session: None, // Will be created on demand
+            tcp_stream: None,
+        };
+
+        // Store the connection
+        let mut connections = self.connections.lock().await;
+        connections.insert(connection_id.clone(), connection);
+
+        Ok(connection_id)
+    }
+
     pub async fn test_connection(&self, request: &SshConnectionRequest) -> Result<String, String> {
         let timeout_duration = Duration::from_secs(10);
 

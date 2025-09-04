@@ -35,30 +35,24 @@ async fn ssh_test_connection(
 #[tauri::command]
 async fn ssh_connect(
     state: State<'_, SshClientState>,
-    connection_id: String,
-) -> Result<bool, String> {
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+) -> Result<String, String> {
     let ssh_client = state.lock().await;
 
-    // Get saved connections to find connection info by ID
-    let saved_connections = ssh_client.get_saved_connections().await;
-
-    let connection = saved_connections
-        .iter()
-        .find(|conn| format!("{}@{}:{}", conn.username, conn.host, conn.port) == connection_id)
-        .ok_or_else(|| "Connection not found".to_string())?;
-
-    // For SSH connections, we would need password - this is a simplified version
-    // In a real app, you'd prompt for password or use key-based auth
     let request = SshConnectionRequest {
-        host: connection.host.clone(),
-        port: connection.port,
-        username: connection.username.clone(),
-        password: "".to_string(), // This would need proper password handling
+        host: host.clone(),
+        port,
+        username: username.clone(),
+        password,
     };
 
-    // For now, just return true to simulate successful connection
-    // In a real implementation, you'd need to handle SSH authentication properly
-    Ok(true)
+    // Use the create_connection method to store the connection persistently
+    let connection_id = ssh_client.create_connection(request).await?;
+
+    Ok(connection_id)
 }
 
 #[tauri::command]
