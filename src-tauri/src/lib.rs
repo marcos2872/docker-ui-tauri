@@ -3,11 +3,16 @@ use crate::docker::{
     ContainerInfo, CreateContainerRequest, DockerInfo, DockerManager, DockerSystemUsage, ImageInfo,
     NetworkInfo, VolumeInfo,
 };
+use crate::docker_ssh::{
+    SshContainerInfo, SshCreateContainerRequest, SshDockerInfo, SshDockerManager, SshDockerStatus,
+    SshDockerSystemUsage, SshImageInfo, SshNetworkInfo, SshVolumeInfo,
+};
 use tauri::State;
 use tokio::sync::Mutex;
 
 mod client_ssh;
 mod docker;
+mod docker_ssh;
 
 // Global Docker Manager para manter cache entre chamadas
 type DockerManagerState = Mutex<Option<DockerManager>>;
@@ -515,6 +520,324 @@ async fn ssh_update_saved_connection_name(
     Ok("Nome da conexão atualizado com sucesso".to_string())
 }
 
+// Comandos Docker SSH
+#[tauri::command]
+async fn ssh_docker_status(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<SshDockerStatus, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .check_docker_status(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_info(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<SshDockerInfo, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .get_docker_info(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_system_usage(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<SshDockerSystemUsage, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .get_docker_system_usage(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_list_containers(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<Vec<SshContainerInfo>, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .list_containers(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_start_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .start_container(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Container iniciado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_stop_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .stop_container(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Container parado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_pause_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .pause_container(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Container pausado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_unpause_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .unpause_container(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Container despausado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_remove_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .remove_container(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Container removido com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_restart_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .restart_container(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Container reiniciado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_list_images(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<Vec<SshImageInfo>, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .list_images(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_remove_image(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    image_id: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .remove_image(&connection_id, &image_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Imagem removida com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_pull_image(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    image_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .pull_image(&connection_id, &image_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Pull da imagem realizado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_list_networks(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<Vec<SshNetworkInfo>, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .list_networks(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_remove_network(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    network_id: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .remove_network(&connection_id, &network_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Network removida com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_create_network(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    network_name: String,
+    driver: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .create_network(&connection_id, &network_name, &driver)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Network criada com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_list_volumes(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<Vec<SshVolumeInfo>, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .list_volumes(&connection_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_remove_volume(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    volume_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .remove_volume(&connection_id, &volume_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Volume removido com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_create_volume(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    volume_name: String,
+    driver: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .create_volume(&connection_id, &volume_name, &driver)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok("Volume criado com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_get_container_logs(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+    tail_lines: Option<String>,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .get_container_logs(&connection_id, &container_name, tail_lines)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn ssh_docker_create_container(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    request: SshCreateContainerRequest,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    let container_id = manager
+        .create_container(&connection_id, request)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(container_id)
+}
+
+#[tauri::command]
+async fn ssh_docker_get_container_stats(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    container_name: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let manager = SshDockerManager::new(&*ssh_client);
+    manager
+        .get_container_stats(&connection_id, &container_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -553,7 +876,29 @@ pub fn run() {
             ssh_get_saved_connections,
             ssh_add_saved_connection,
             ssh_remove_saved_connection,
-            ssh_update_saved_connection_name
+            ssh_update_saved_connection_name,
+            ssh_docker_status,
+            ssh_docker_info,
+            ssh_docker_system_usage,
+            ssh_docker_list_containers,
+            ssh_docker_start_container,
+            ssh_docker_stop_container,
+            ssh_docker_pause_container,
+            ssh_docker_unpause_container,
+            ssh_docker_remove_container,
+            ssh_docker_restart_container,
+            ssh_docker_list_images,
+            ssh_docker_remove_image,
+            ssh_docker_pull_image,
+            ssh_docker_list_networks,
+            ssh_docker_remove_network,
+            ssh_docker_create_network,
+            ssh_docker_list_volumes,
+            ssh_docker_remove_volume,
+            ssh_docker_create_volume,
+            ssh_docker_get_container_logs,
+            ssh_docker_create_container,
+            ssh_docker_get_container_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

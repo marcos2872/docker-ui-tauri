@@ -154,16 +154,6 @@ impl SshClient {
             last_activity: current_time,
         };
 
-        // Salvar a conexão para persistência (sem a senha)
-        let saved_connection = SavedSshConnection {
-            host: request.host,
-            port: request.port,
-            username: request.username,
-            name: None,
-        };
-
-        let _ = self.add_saved_connection(saved_connection).await;
-
         let connection = SshConnection {
             info: connection_info,
             session: Some(session),
