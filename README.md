@@ -133,12 +133,18 @@ A modern desktop Docker management application built with Tauri, React, and Type
    cd docker-ui-tauri
    ```
 
-2. **Install dependencies**:
+2. **Install system dependencies** (Linux only):
+   ```bash
+   # Install GTK and WebKit development libraries
+   sudo apt-get install libgtk-3-dev libgtk-4-dev libglib2.0-dev libgdk-pixbuf2.0-dev libpango1.0-dev libcairo2-dev libatk1.0-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev
+   ```
+
+3. **Install dependencies**:
    ```bash
    pnpm install
    ```
 
-3. **Install Tauri CLI** (if not already installed):
+4. **Install Tauri CLI** (if not already installed):
    ```bash
    cargo install tauri-cli
    ```
