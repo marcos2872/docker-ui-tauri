@@ -35,7 +35,7 @@ async fn ssh_test_connection(
 #[tauri::command]
 async fn ssh_connect(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<bool, String> {
     let ssh_client = state.lock().await;
 
@@ -64,7 +64,7 @@ async fn ssh_connect(
 #[tauri::command]
 async fn ssh_disconnect(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     ssh_client.disconnect(&connection_id).await
@@ -183,7 +183,7 @@ async fn ssh_update_saved_connection_name(
 #[tauri::command]
 async fn ssh_docker_status(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<SshDockerStatus, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -196,7 +196,7 @@ async fn ssh_docker_status(
 #[tauri::command]
 async fn ssh_docker_info(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<SshDockerInfo, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -209,7 +209,7 @@ async fn ssh_docker_info(
 #[tauri::command]
 async fn ssh_docker_system_usage(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<SshDockerSystemUsage, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -222,7 +222,7 @@ async fn ssh_docker_system_usage(
 #[tauri::command]
 async fn ssh_docker_list_containers(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<Vec<SshContainerInfo>, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -235,8 +235,8 @@ async fn ssh_docker_list_containers(
 #[tauri::command]
 async fn ssh_docker_start_container(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
-    #[serde(rename = "containerName")] container_name: String,
+    connection_id: String,
+    container_name: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -250,8 +250,8 @@ async fn ssh_docker_start_container(
 #[tauri::command]
 async fn ssh_docker_stop_container(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
-    #[serde(rename = "containerName")] container_name: String,
+    connection_id: String,
+    container_name: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -265,8 +265,8 @@ async fn ssh_docker_stop_container(
 #[tauri::command]
 async fn ssh_docker_pause_container(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
-    #[serde(rename = "containerName")] container_name: String,
+    connection_id: String,
+    container_name: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -280,8 +280,8 @@ async fn ssh_docker_pause_container(
 #[tauri::command]
 async fn ssh_docker_unpause_container(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
-    #[serde(rename = "containerName")] container_name: String,
+    connection_id: String,
+    container_name: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -295,8 +295,8 @@ async fn ssh_docker_unpause_container(
 #[tauri::command]
 async fn ssh_docker_remove_container(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
-    #[serde(rename = "containerName")] container_name: String,
+    connection_id: String,
+    container_name: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -310,8 +310,8 @@ async fn ssh_docker_remove_container(
 #[tauri::command]
 async fn ssh_docker_restart_container(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
-    #[serde(rename = "containerName")] container_name: String,
+    connection_id: String,
+    container_name: String,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -325,7 +325,7 @@ async fn ssh_docker_restart_container(
 #[tauri::command]
 async fn ssh_docker_list_images(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<Vec<SshImageInfo>, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -368,7 +368,7 @@ async fn ssh_docker_pull_image(
 #[tauri::command]
 async fn ssh_docker_list_networks(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<Vec<SshNetworkInfo>, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
@@ -412,7 +412,7 @@ async fn ssh_docker_create_network(
 #[tauri::command]
 async fn ssh_docker_list_volumes(
     state: State<'_, SshClientState>,
-    #[serde(rename = "connectionId")] connection_id: String,
+    connection_id: String,
 ) -> Result<Vec<SshVolumeInfo>, String> {
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
