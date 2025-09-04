@@ -1,13 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { FaTrash, FaSearch, FaDownload, FaSync, FaImage } from "react-icons/fa";
 import { PullImageModal } from "../../components/PullImageModal";
 import { ToastContainer, useToast } from "../../components/Toast";
+import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
 
-interface ImageInfo {
-  id: string;
-  repository: string;
-  tag: string;
+interface ExtendedImageInfo extends ImageInfo {
   created: number;
   size: number;
   containers: number;
@@ -17,27 +14,36 @@ interface ImageInfo {
 type FilterType = "all" | "in_use" | "unused";
 
 export function Images() {
-  const [images, setImages] = useState<ImageInfo[]>([]);
-  const [filteredImages, setFilteredImages] = useState<ImageInfo[]>([]);
+  const [images, setImages] = useState<ExtendedImageInfo[]>([]);
+  const [filteredImages, setFilteredImages] = useState<ExtendedImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPullModalOpen, setIsPullModalOpen] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const { listImages, removeImage } = useDockerApi();
 
   const fetchImages = useCallback(async () => {
     try {
       setLoading(true);
-      const imageList: ImageInfo[] = await invoke("ssh_docker_list_images");
-      setImages(imageList);
+      const imageList = await listImages();
+      // Convert ImageInfo to ExtendedImageInfo with default values
+      const extendedImageList: ExtendedImageInfo[] = imageList.map((image) => ({
+        ...image,
+        created: Date.now(),
+        size: 0,
+        containers: 0,
+        in_use: false,
+      }));
+      setImages(extendedImageList);
     } catch (error) {
       console.error("Error fetching images:", error);
       showError("Erro ao buscar imagens");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [listImages]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -54,7 +60,7 @@ export function Images() {
     }
 
     try {
-      await invoke("ssh_docker_remove_image", { imageId });
+      await removeImage(imageId);
       showSuccess("Imagem removida com sucesso");
       await fetchImages();
     } catch (error) {
@@ -92,7 +98,11 @@ export function Images() {
     return inUse ? "bg-green-400" : "bg-gray-400";
   };
 
-  const filterImages = useCallback(() => {
+  useEffect(() => {
+    fetchImages();
+  }, [fetchImages]);
+
+  useEffect(() => {
     let filtered = images;
 
     // Apply usage filter
@@ -125,14 +135,6 @@ export function Images() {
 
     setFilteredImages(filtered);
   }, [images, activeFilter, searchQuery]);
-
-  useEffect(() => {
-    fetchImages();
-  }, [fetchImages]);
-
-  useEffect(() => {
-    filterImages();
-  }, [filterImages]);
 
   const FilterButton = ({
     filter,

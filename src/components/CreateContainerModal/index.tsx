@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { FaTimes, FaPlus, FaTrash } from "react-icons/fa";
+import { useDockerApi } from "../../hooks/useDockerApi";
 
 interface PortMapping {
   host_port: number;
@@ -45,6 +45,7 @@ export function CreateContainerModal({
   onShowError,
 }: CreateContainerModalProps) {
   const [loading, setLoading] = useState(false);
+  const { createContainer } = useDockerApi();
   const [formData, setFormData] = useState<CreateContainerRequest>({
     name: "",
     image: "",
@@ -141,11 +142,10 @@ export function CreateContainerModal({
 
     setLoading(true);
     try {
-      await invoke("ssh_docker_create_container", {
-        request: {
-          ...formData,
-          command: formData.command || null,
-        },
+      await createContainer({
+        ...formData,
+        detach: true,
+        command: formData.command || undefined,
       });
       onShowSuccess?.(`Container "${formData.name}" criado com sucesso!`);
       onSuccess();

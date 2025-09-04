@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { FaTimes, FaHdd } from "react-icons/fa";
+import { useDockerApi } from "../../hooks/useDockerApi";
 
 interface CreateVolumeModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ export function CreateVolumeModal({
   const [volumeName, setVolumeName] = useState("");
   const [driver, setDriver] = useState("local");
   const [isCreating, setIsCreating] = useState(false);
+  const { createVolume } = useDockerApi();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,10 +33,7 @@ export function CreateVolumeModal({
     setIsCreating(true);
 
     try {
-      await invoke("ssh_docker_create_volume", {
-        volumeName: volumeName.trim(),
-        driver,
-      });
+      await createVolume(volumeName.trim());
 
       onShowSuccess(`Volume "${volumeName}" criado com sucesso`);
       onSuccess();

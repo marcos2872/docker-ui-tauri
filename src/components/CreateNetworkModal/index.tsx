@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { FaTimes, FaNetworkWired } from "react-icons/fa";
+import { useDockerApi } from "../../hooks/useDockerApi";
 
 interface CreateNetworkModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ export function CreateNetworkModal({
   const [networkName, setNetworkName] = useState("");
   const [driver, setDriver] = useState("bridge");
   const [isCreating, setIsCreating] = useState(false);
+  const { createNetwork } = useDockerApi();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,10 +33,7 @@ export function CreateNetworkModal({
     setIsCreating(true);
 
     try {
-      await invoke("ssh_docker_create_network", {
-        networkName: networkName.trim(),
-        driver,
-      });
+      await createNetwork(networkName.trim());
 
       onShowSuccess(`Network "${networkName}" criada com sucesso`);
       onSuccess();

@@ -1,13 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { FaTrash, FaSearch, FaPlus, FaSync, FaHdd } from "react-icons/fa";
 import { CreateVolumeModal } from "../../components/CreateVolumeModal";
 import { ToastContainer, useToast } from "../../components/Toast";
+import { useDockerApi, VolumeInfo } from "../../hooks/useDockerApi";
 
-interface VolumeInfo {
-  name: string;
-  driver: string;
-  mountpoint: string;
+interface ExtendedVolumeInfo extends VolumeInfo {
   created: string;
   containers_count: number;
 }
@@ -15,27 +12,38 @@ interface VolumeInfo {
 type FilterType = "all" | "in_use" | "unused";
 
 export function Volumes() {
-  const [volumes, setVolumes] = useState<VolumeInfo[]>([]);
-  const [filteredVolumes, setFilteredVolumes] = useState<VolumeInfo[]>([]);
+  const [volumes, setVolumes] = useState<ExtendedVolumeInfo[]>([]);
+  const [filteredVolumes, setFilteredVolumes] = useState<ExtendedVolumeInfo[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const { listVolumes, removeVolume } = useDockerApi();
 
   const fetchVolumes = useCallback(async () => {
     try {
       setLoading(true);
-      const volumeList: VolumeInfo[] = await invoke("ssh_docker_list_volumes");
-      setVolumes(volumeList);
+      const volumeList = await listVolumes();
+      // Convert VolumeInfo to ExtendedVolumeInfo with default values
+      const extendedVolumeList: ExtendedVolumeInfo[] = volumeList.map(
+        (volume) => ({
+          ...volume,
+          created: new Date().toISOString(),
+          containers_count: 0,
+        }),
+      );
+      setVolumes(extendedVolumeList);
     } catch (error) {
       console.error("Error fetching volumes:", error);
       showError("Erro ao buscar volumes");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [listVolumes]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -52,7 +60,7 @@ export function Volumes() {
     }
 
     try {
-      await invoke("ssh_docker_remove_volume", { volumeName });
+      await removeVolume(volumeName);
       showSuccess("Volume removido com sucesso");
       await fetchVolumes();
     } catch (error) {
@@ -84,7 +92,11 @@ export function Volumes() {
     return inUse ? "bg-green-400" : "bg-gray-400";
   };
 
-  const filterVolumes = useCallback(() => {
+  useEffect(() => {
+    fetchVolumes();
+  }, [fetchVolumes]);
+
+  useEffect(() => {
     let filtered = volumes;
 
     // Apply usage filter
@@ -114,14 +126,6 @@ export function Volumes() {
 
     setFilteredVolumes(filtered);
   }, [volumes, activeFilter, searchQuery]);
-
-  useEffect(() => {
-    fetchVolumes();
-  }, [fetchVolumes]);
-
-  useEffect(() => {
-    filterVolumes();
-  }, [filterVolumes]);
 
   const FilterButton = ({
     filter,

@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import {
   FaTrash,
@@ -9,12 +8,9 @@ import {
 } from "react-icons/fa";
 import { CreateNetworkModal } from "../../components/CreateNetworkModal";
 import { ToastContainer, useToast } from "../../components/Toast";
+import { useDockerApi, NetworkInfo } from "../../hooks/useDockerApi";
 
-interface NetworkInfo {
-  id: string;
-  name: string;
-  driver: string;
-  scope: string;
+interface ExtendedNetworkInfo extends NetworkInfo {
   created: string;
   containers_count: number;
   is_system: boolean;
@@ -23,29 +19,42 @@ interface NetworkInfo {
 type FilterType = "all" | "custom" | "system";
 
 export function Networks() {
-  const [networks, setNetworks] = useState<NetworkInfo[]>([]);
-  const [filteredNetworks, setFilteredNetworks] = useState<NetworkInfo[]>([]);
+  const [networks, setNetworks] = useState<ExtendedNetworkInfo[]>([]);
+  const [filteredNetworks, setFilteredNetworks] = useState<
+    ExtendedNetworkInfo[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const { listNetworks, removeNetwork } = useDockerApi();
 
   const fetchNetworks = useCallback(async () => {
     try {
       setLoading(true);
-      const networkList: NetworkInfo[] = await invoke(
-        "ssh_docker_list_networks",
+      const networkList = await listNetworks();
+      // Convert NetworkInfo to ExtendedNetworkInfo with default values
+      const extendedNetworkList: ExtendedNetworkInfo[] = networkList.map(
+        (network) => ({
+          ...network,
+          created: new Date().toISOString(),
+          containers_count: 0,
+          is_system:
+            network.name === "bridge" ||
+            network.name === "host" ||
+            network.name === "none",
+        }),
       );
-      setNetworks(networkList);
+      setNetworks(extendedNetworkList);
     } catch (error) {
       console.error("Error fetching networks:", error);
       showError("Erro ao buscar networks");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [listNetworks]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -67,7 +76,7 @@ export function Networks() {
     }
 
     try {
-      await invoke("ssh_docker_remove_network", { networkId });
+      await removeNetwork(networkId);
       showSuccess("Network removida com sucesso");
       await fetchNetworks();
     } catch (error) {
@@ -99,7 +108,11 @@ export function Networks() {
     return isSystem ? "bg-yellow-400" : "bg-green-400";
   };
 
-  const filterNetworks = useCallback(() => {
+  useEffect(() => {
+    fetchNetworks();
+  }, [fetchNetworks]);
+
+  useEffect(() => {
     let filtered = networks;
 
     // Apply type filter
@@ -130,14 +143,6 @@ export function Networks() {
 
     setFilteredNetworks(filtered);
   }, [networks, activeFilter, searchQuery]);
-
-  useEffect(() => {
-    fetchNetworks();
-  }, [fetchNetworks]);
-
-  useEffect(() => {
-    filterNetworks();
-  }, [filterNetworks]);
 
   const FilterButton = ({
     filter,

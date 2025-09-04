@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { FaTimes, FaDownload } from "react-icons/fa";
+import { useDockerApi } from "../../hooks/useDockerApi";
 
 interface PullImageModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ export function PullImageModal({
   const [imageName, setImageName] = useState("");
   const [tag, setTag] = useState("latest");
   const [isPulling, setIsPulling] = useState(false);
+  const { pullImage } = useDockerApi();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +34,7 @@ export function PullImageModal({
 
     try {
       const fullImageName = tag ? `${imageName}:${tag}` : imageName;
-      await invoke("ssh_docker_pull_image", { imageName: fullImageName });
+      await pullImage(fullImageName);
 
       onShowSuccess(`Imagem ${fullImageName} baixada com sucesso`);
       onSuccess();

@@ -139,7 +139,11 @@ export function Containers() {
     }
   };
 
-  const filterContainers = useCallback(() => {
+  useEffect(() => {
+    fetchContainers();
+  }, [fetchContainers]);
+
+  useEffect(() => {
     let filtered = containers;
 
     // Apply status filter
@@ -174,14 +178,6 @@ export function Containers() {
 
     setFilteredContainers(filtered);
   }, [containers, activeFilter, searchQuery]);
-
-  useEffect(() => {
-    fetchContainers();
-  }, [fetchContainers]);
-
-  useEffect(() => {
-    filterContainers();
-  }, [filterContainers]);
 
   const FilterButton = ({
     filter,
