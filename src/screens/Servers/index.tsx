@@ -99,7 +99,7 @@ export function Servers() {
       setSavedConnections(connections);
 
       // Convert saved connections to server format
-      const servers = connections.map((conn, index) => ({
+      const servers = connections.map((conn) => ({
         id: `${conn.host}:${conn.port}:${conn.username}`,
         host: conn.host,
         label: conn.name || `${conn.username}@${conn.host}:${conn.port}`,
