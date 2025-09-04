@@ -7,7 +7,6 @@ interface ServerData {
   label: string;
   port: number;
   user: string;
-  password: string;
 }
 
 interface AddServerModalProps {
@@ -30,9 +29,9 @@ export function AddServerModal({
     label: "",
     port: 22,
     user: "",
-    password: "",
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  const [testPassword, setTestPassword] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +40,7 @@ export function AddServerModal({
       !serverData.host.trim() ||
       !serverData.label.trim() ||
       !serverData.user.trim() ||
-      !serverData.password.trim()
+      !testPassword.trim()
     ) {
       onShowError("Todos os campos são obrigatórios");
       return;
@@ -51,11 +50,11 @@ export function AddServerModal({
 
     try {
       // Test SSH connection
-      await invoke("test_ssh_connection", {
+      await invoke("ssh_test_connection", {
         host: serverData.host,
         port: serverData.port,
-        user: serverData.user,
-        password: serverData.password,
+        username: serverData.user,
+        password: testPassword,
       });
 
       onShowSuccess(`Conexão com ${serverData.label} estabelecida com sucesso`);
@@ -76,8 +75,8 @@ export function AddServerModal({
         label: "",
         port: 22,
         user: "",
-        password: "",
       });
+      setTestPassword("");
       onClose();
     }
   };
@@ -170,23 +169,25 @@ export function AddServerModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Senha *
+                Senha (apenas para teste) *
               </label>
               <input
                 type="password"
-                value={serverData.password}
-                onChange={(e) =>
-                  setServerData({ ...serverData, password: e.target.value })
-                }
+                value={testPassword}
+                onChange={(e) => setTestPassword(e.target.value)}
                 placeholder="Digite a senha do usuário"
                 disabled={isConnecting}
                 className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50"
               />
             </div>
 
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-400 space-y-1">
               <p>
                 A conexão será testada antes de adicionar o servidor à lista.
+              </p>
+              <p className="text-yellow-400">
+                ⚠️ A senha é usada apenas para teste e não será salva por
+                segurança.
               </p>
             </div>
           </div>
@@ -207,7 +208,7 @@ export function AddServerModal({
                 !serverData.host.trim() ||
                 !serverData.label.trim() ||
                 !serverData.user.trim() ||
-                !serverData.password.trim()
+                !testPassword.trim()
               }
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >

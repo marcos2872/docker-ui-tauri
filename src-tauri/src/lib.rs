@@ -1,3 +1,4 @@
+use crate::client_ssh::{SavedSshConnection, SshClient, SshConnectionInfo, SshConnectionRequest};
 use crate::docker::{
     ContainerInfo, CreateContainerRequest, DockerInfo, DockerManager, DockerSystemUsage, ImageInfo,
     NetworkInfo, VolumeInfo,
@@ -5,10 +6,14 @@ use crate::docker::{
 use tauri::State;
 use tokio::sync::Mutex;
 
+mod client_ssh;
 mod docker;
 
 // Global Docker Manager para manter cache entre chamadas
 type DockerManagerState = Mutex<Option<DockerManager>>;
+
+// Global SSH Client para gerenciar conexões SSH
+type SshClientState = Mutex<SshClient>;
 
 async fn get_docker_manager(
     state: &State<'_, DockerManagerState>,
@@ -357,55 +362,157 @@ async fn docker_create_network(
 }
 
 #[tauri::command]
-async fn test_ssh_connection(
+async fn ssh_test_connection(
+    state: State<'_, SshClientState>,
     host: String,
     port: u16,
-    user: String,
+    username: String,
     password: String,
 ) -> Result<String, String> {
-    // Simulate SSH connection test
-    // In a real implementation, you would use an SSH library like ssh2
-    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-
-    // For demonstration, we'll just validate the inputs
-    if host.is_empty() || user.is_empty() || password.is_empty() {
-        return Err("Invalid connection parameters".to_string());
-    }
-
-    // Simulate connection success/failure based on host
-    if host.contains("invalid") || host.contains("error") {
-        return Err("Connection failed: Host unreachable".to_string());
-    }
-
-    Ok(format!("Connection successful to {}:{}", host, port))
+    let ssh_client = state.lock().await;
+    let request = SshConnectionRequest {
+        host,
+        port,
+        username,
+        password,
+    };
+    ssh_client.test_connection(&request).await
 }
 
 #[tauri::command]
-async fn connect_to_server(
+async fn ssh_connect(
+    state: State<'_, SshClientState>,
     host: String,
     port: u16,
-    user: String,
+    username: String,
     password: String,
 ) -> Result<String, String> {
-    // Simulate establishing SSH connection
-    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-
-    // In a real implementation, this would establish and maintain an SSH connection
-    // For now, we'll just simulate success using the password parameter
-    if password.is_empty() {
-        return Err("Password is required".to_string());
-    }
-
-    Ok(format!("Connected to {}@{}:{}", user, host, port))
+    let ssh_client = state.lock().await;
+    let request = SshConnectionRequest {
+        host,
+        port,
+        username,
+        password,
+    };
+    ssh_client.connect(request).await
 }
 
 #[tauri::command]
-async fn disconnect_from_server() -> Result<String, String> {
-    // Simulate disconnecting from SSH server
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+async fn ssh_disconnect(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    ssh_client.disconnect(&connection_id).await
+}
 
-    // In a real implementation, this would close the SSH connection
-    Ok("Disconnected successfully".to_string())
+#[tauri::command]
+async fn ssh_disconnect_all(state: State<'_, SshClientState>) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    ssh_client.disconnect_all().await
+}
+
+#[tauri::command]
+async fn ssh_list_connections(
+    state: State<'_, SshClientState>,
+) -> Result<Vec<SshConnectionInfo>, String> {
+    let ssh_client = state.lock().await;
+    ssh_client.list_connections().await
+}
+
+#[tauri::command]
+async fn ssh_get_connection_info(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<SshConnectionInfo, String> {
+    let ssh_client = state.lock().await;
+    ssh_client.get_connection_info(&connection_id).await
+}
+
+#[tauri::command]
+async fn ssh_is_connected(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+) -> Result<bool, String> {
+    let ssh_client = state.lock().await;
+    ssh_client.is_connected(&connection_id).await
+}
+
+#[tauri::command]
+async fn ssh_execute_command(
+    state: State<'_, SshClientState>,
+    connection_id: String,
+    command: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    ssh_client.execute_command(&connection_id, &command).await
+}
+
+#[tauri::command]
+async fn ssh_cleanup_inactive_connections(
+    state: State<'_, SshClientState>,
+    max_idle_minutes: u64,
+) -> Result<usize, String> {
+    let ssh_client = state.lock().await;
+    ssh_client
+        .cleanup_inactive_connections(max_idle_minutes)
+        .await
+}
+
+#[tauri::command]
+async fn ssh_get_saved_connections(
+    state: State<'_, SshClientState>,
+) -> Result<Vec<SavedSshConnection>, String> {
+    let ssh_client = state.lock().await;
+    Ok(ssh_client.get_saved_connections().await)
+}
+
+#[tauri::command]
+async fn ssh_add_saved_connection(
+    state: State<'_, SshClientState>,
+    host: String,
+    port: u16,
+    username: String,
+    name: Option<String>,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    let connection = SavedSshConnection {
+        host,
+        port,
+        username,
+        name,
+    };
+    ssh_client.add_saved_connection(connection).await?;
+    Ok("Conexão salva com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_remove_saved_connection(
+    state: State<'_, SshClientState>,
+    host: String,
+    port: u16,
+    username: String,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    ssh_client
+        .remove_saved_connection(&host, port, &username)
+        .await?;
+    Ok("Conexão removida com sucesso".to_string())
+}
+
+#[tauri::command]
+async fn ssh_update_saved_connection_name(
+    state: State<'_, SshClientState>,
+    host: String,
+    port: u16,
+    username: String,
+    name: Option<String>,
+) -> Result<String, String> {
+    let ssh_client = state.lock().await;
+    ssh_client
+        .update_saved_connection_name(&host, port, &username, name)
+        .await?;
+    Ok("Nome da conexão atualizado com sucesso".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -413,6 +520,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(DockerManagerState::default())
+        .manage(SshClientState::new(SshClient::new()))
         .invoke_handler(tauri::generate_handler![
             docker_status,
             docker_infos,
@@ -433,9 +541,19 @@ pub fn run() {
             docker_list_networks,
             docker_remove_network,
             docker_create_network,
-            test_ssh_connection,
-            connect_to_server,
-            disconnect_from_server
+            ssh_test_connection,
+            ssh_connect,
+            ssh_disconnect,
+            ssh_disconnect_all,
+            ssh_list_connections,
+            ssh_get_connection_info,
+            ssh_is_connected,
+            ssh_execute_command,
+            ssh_cleanup_inactive_connections,
+            ssh_get_saved_connections,
+            ssh_add_saved_connection,
+            ssh_remove_saved_connection,
+            ssh_update_saved_connection_name
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

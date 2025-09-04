@@ -1,0 +1,32 @@
+[
+  {
+    "host": "192.168.1.100",
+    "port": 22,
+    "username": "ubuntu",
+    "name": "Servidor de Produção"
+  },
+  {
+    "host": "dev.example.com",
+    "port": 2222,
+    "username": "admin",
+    "name": "Servidor de Desenvolvimento"
+  },
+  {
+    "host": "10.0.0.50",
+    "port": 22,
+    "username": "root",
+    "name": "Database Server"
+  },
+  {
+    "host": "staging.mycompany.com",
+    "port": 22,
+    "username": "deploy",
+    "name": "Ambiente de Staging"
+  },
+  {
+    "host": "backup.local",
+    "port": 2200,
+    "username": "backup",
+    "name": "Servidor de Backup"
+  }
+]
