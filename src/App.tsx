@@ -9,27 +9,30 @@ import { Volumes } from "./screens/Volumes";
 import { Networks } from "./screens/Networks";
 import { Servers } from "./screens/Servers";
 import { MonitoringProvider } from "./contexts/MonitoringContext";
+import { DockerConnectionProvider } from "./contexts/DockerConnectionContext";
 
 function App() {
   const [screen, setScreen] = useState(0);
 
   return (
-    <MonitoringProvider>
-      <main className="w-full flex flex-col h-screen bg-gray-800 overflow-hidden rounded-lg">
-        <Header />
-        <section className="w-full h-[calc(100vh-32px)] flex overflow-hidden">
-          <NavBar changeScreen={setScreen} screen={screen} />
-          <section className="w-full rounded-br-lg overflow-hidden">
-            {screen === 0 && <Dashboard />}
-            {screen === 1 && <Containers />}
-            {screen === 2 && <Images />}
-            {screen === 3 && <Volumes />}
-            {screen === 4 && <Networks />}
-            {screen === 5 && <Servers />}
+    <DockerConnectionProvider>
+      <MonitoringProvider>
+        <main className="w-full flex flex-col h-screen bg-gray-800 overflow-hidden rounded-lg">
+          <Header />
+          <section className="w-full h-[calc(100vh-32px)] flex overflow-hidden">
+            <NavBar changeScreen={setScreen} screen={screen} />
+            <section className="w-full rounded-br-lg overflow-hidden">
+              {screen === 0 && <Dashboard />}
+              {screen === 1 && <Containers />}
+              {screen === 2 && <Images />}
+              {screen === 3 && <Volumes />}
+              {screen === 4 && <Networks />}
+              {screen === 5 && <Servers />}
+            </section>
           </section>
-        </section>
-      </main>
-    </MonitoringProvider>
+        </main>
+      </MonitoringProvider>
+    </DockerConnectionProvider>
   );
 }
 

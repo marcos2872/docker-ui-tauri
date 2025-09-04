@@ -41,7 +41,7 @@ export function Containers() {
     try {
       setLoading(true);
       const containerList: ContainerInfo[] = await invoke(
-        "docker_list_containers",
+        "ssh_docker_list_containers",
       );
       setContainers(containerList);
     } catch (error) {
@@ -63,19 +63,19 @@ export function Containers() {
       let command = "";
       switch (action) {
         case "start":
-          command = "docker_start_container";
+          command = "ssh_docker_start_container";
           break;
         case "stop":
-          command = "docker_stop_container";
+          command = "ssh_docker_stop_container";
           break;
         case "pause":
-          command = "docker_pause_container";
+          command = "ssh_docker_pause_container";
           break;
         case "unpause":
-          command = "docker_unpause_container";
+          command = "ssh_docker_unpause_container";
           break;
         case "remove":
-          command = "docker_remove_container";
+          command = "ssh_docker_remove_container";
           break;
         default:
           return;

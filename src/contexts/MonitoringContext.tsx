@@ -6,17 +6,13 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useDockerApi } from "../hooks/useDockerApi";
 
 interface DockerSystemUsage {
-  cpu_online: number;
-  cpu_usage: number;
-  memory_usage: number;
-  memory_limit: number;
-  network_rx_bytes: number;
-  network_tx_bytes: number;
-  block_read_bytes: number;
-  block_write_bytes: number;
+  containers_running: number;
+  containers_total: number;
+  images_total: number;
+  system_info: string;
 }
 
 interface CpuDataPoint {
@@ -80,6 +76,7 @@ const loadFromStorage = () => {
 };
 
 export function MonitoringProvider({ children }: MonitoringProviderProps) {
+  const { getDockerSystemUsage } = useDockerApi();
   const savedData = loadFromStorage();
 
   const [cpuHistory, setCpuHistory] = useState<CpuDataPoint[]>(
@@ -93,14 +90,10 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
   );
   const [currentSystemUsage, setCurrentSystemUsage] =
     useState<DockerSystemUsage>({
-      cpu_online: 0,
-      cpu_usage: 0,
-      memory_usage: 0,
-      memory_limit: 0,
-      network_rx_bytes: 0,
-      network_tx_bytes: 0,
-      block_read_bytes: 0,
-      block_write_bytes: 0,
+      containers_running: 0,
+      containers_total: 0,
+      images_total: 0,
+      system_info: "",
     });
 
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -135,9 +128,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
 
   const collectData = useCallback(async () => {
     try {
-      const systemUsage = (await invoke(
-        "docker_system_usage",
-      )) as DockerSystemUsage;
+      const systemUsage = await getDockerSystemUsage();
       setCurrentSystemUsage(systemUsage);
       setLastUpdate(new Date());
 
@@ -151,7 +142,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
 
       // Add CPU data to history
       setCpuHistory((prev) => {
-        const cpuPercentage = systemUsage.cpu_usage;
+        const cpuPercentage = systemUsage.containers_running;
         const newHistory = [
           ...prev,
           {
@@ -165,7 +156,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
 
       // Add Memory data to history (in MB)
       setMemoryHistory((prev) => {
-        const memoryUsageMB = systemUsage.memory_usage / 1024 / 1024;
+        const memoryUsageMB = systemUsage.containers_total;
         const newHistory = [
           ...prev,
           {
@@ -183,8 +174,8 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
           ...prev,
           {
             time: timeStr,
-            rx: systemUsage.network_rx_bytes,
-            tx: systemUsage.network_tx_bytes,
+            rx: systemUsage.images_total,
+            tx: systemUsage.containers_total,
           },
         ];
 
@@ -193,7 +184,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     } catch (error) {
       console.error("Error collecting monitoring data:", error);
     }
-  }, []);
+  }, [getDockerSystemUsage]);
 
   // Save to localStorage whenever data changes
   useEffect(() => {
@@ -317,7 +308,7 @@ export function useMonitoringStats() {
   };
 
   const getCpuMaxValue = () => {
-    const cpuOnlineMax = currentSystemUsage.cpu_online * 100;
+    const cpuOnlineMax = currentSystemUsage.containers_total * 10;
 
     if (cpuHistory.length === 0) {
       return Math.min(100, cpuOnlineMax);
@@ -331,7 +322,7 @@ export function useMonitoringStats() {
   };
 
   const getMemoryMaxValue = () => {
-    const memoryLimitMB = currentSystemUsage.memory_limit / 1024 / 1024;
+    const memoryLimitMB = currentSystemUsage.containers_total * 100;
 
     if (memoryHistory.length === 0) {
       return memoryLimitMB > 0 ? memoryLimitMB : 1024;
@@ -409,23 +400,8 @@ export function useMonitoringStats() {
     formatNetworkValue,
 
     // Titles
-    cpuTitle: `CPU Total: ${currentSystemUsage.cpu_usage.toFixed(2)}% | ${currentSystemUsage.cpu_online} cores`,
-    memoryTitle: (() => {
-      const usageInMB = currentSystemUsage.memory_usage / 1024 / 1024;
-      const usageDisplay =
-        usageInMB > 1024
-          ? formatMemoryValue(currentSystemUsage.memory_usage, "GB")
-          : formatMemoryValue(currentSystemUsage.memory_usage, "MB");
-      const limitDisplay = formatMemoryValue(
-        currentSystemUsage.memory_limit,
-        "GB",
-      );
-      return `Memória RAM: ${usageDisplay} / ${limitDisplay}`;
-    })(),
-    networkTitle: (() => {
-      const rx = formatNetworkValue(currentSystemUsage.network_rx_bytes);
-      const tx = formatNetworkValue(currentSystemUsage.network_tx_bytes);
-      return `Rede RX: ${rx} | TX: ${tx}`;
-    })(),
+    cpuTitle: `Containers Running: ${currentSystemUsage.containers_running} | Total: ${currentSystemUsage.containers_total}`,
+    memoryTitle: `Images: ${currentSystemUsage.images_total}`,
+    networkTitle: `System: ${currentSystemUsage.system_info || "Docker via SSH"}`,
   };
 }

@@ -35,7 +35,9 @@ export function Networks() {
   const fetchNetworks = useCallback(async () => {
     try {
       setLoading(true);
-      const networkList: NetworkInfo[] = await invoke("docker_list_networks");
+      const networkList: NetworkInfo[] = await invoke(
+        "ssh_docker_list_networks",
+      );
       setNetworks(networkList);
     } catch (error) {
       console.error("Error fetching networks:", error);
@@ -65,7 +67,7 @@ export function Networks() {
     }
 
     try {
-      await invoke("docker_remove_network", { networkId });
+      await invoke("ssh_docker_remove_network", { networkId });
       showSuccess("Network removida com sucesso");
       await fetchNetworks();
     } catch (error) {

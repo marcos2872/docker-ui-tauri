@@ -93,7 +93,8 @@ export function useDockerApi() {
           ...args,
         });
       } else {
-        throw new Error("SSH connection required");
+        // Return default/empty data instead of throwing error
+        return null;
       }
     },
     [connectionType, currentSshConnection],
@@ -101,27 +102,47 @@ export function useDockerApi() {
 
   // Docker Status
   const getDockerStatus = useCallback(async () => {
-    return await invokeCommand("ssh_docker_status");
+    const result = await invokeCommand("ssh_docker_status");
+    return result || "No Connection";
   }, [invokeCommand]);
 
   // Docker Info
   const getDockerInfo = useCallback(async (): Promise<DockerInfo> => {
-    return (await invokeCommand("ssh_docker_info")) as DockerInfo;
+    const result = await invokeCommand("ssh_docker_info");
+    return result
+      ? (result as DockerInfo)
+      : {
+          version: "N/A",
+          server_version: "N/A",
+          containers_total: 0,
+          containers_running: 0,
+          containers_paused: 0,
+          containers_stopped: 0,
+          images: 0,
+          architecture: "N/A",
+          os: "N/A",
+          kernel_version: "N/A",
+        };
   }, [invokeCommand]);
 
   // System Usage
   const getDockerSystemUsage =
     useCallback(async (): Promise<DockerSystemUsage> => {
-      return (await invokeCommand(
-        "ssh_docker_system_usage",
-      )) as DockerSystemUsage;
+      const result = await invokeCommand("ssh_docker_system_usage");
+      return result
+        ? (result as DockerSystemUsage)
+        : {
+            containers_running: 0,
+            containers_total: 0,
+            images_total: 0,
+            system_info: "No SSH Connection",
+          };
     }, [invokeCommand]);
 
   // Containers
   const listContainers = useCallback(async (): Promise<ContainerInfo[]> => {
-    return (await invokeCommand(
-      "ssh_docker_list_containers",
-    )) as ContainerInfo[];
+    const result = await invokeCommand("ssh_docker_list_containers");
+    return result ? (result as ContainerInfo[]) : [];
   }, [invokeCommand]);
 
   const startContainer = useCallback(
@@ -205,7 +226,8 @@ export function useDockerApi() {
 
   // Images
   const listImages = useCallback(async (): Promise<ImageInfo[]> => {
-    return (await invokeCommand("ssh_docker_list_images")) as ImageInfo[];
+    const result = await invokeCommand("ssh_docker_list_images");
+    return result ? (result as ImageInfo[]) : [];
   }, [invokeCommand]);
 
   const removeImage = useCallback(
@@ -224,7 +246,8 @@ export function useDockerApi() {
 
   // Networks
   const listNetworks = useCallback(async (): Promise<NetworkInfo[]> => {
-    return (await invokeCommand("ssh_docker_list_networks")) as NetworkInfo[];
+    const result = await invokeCommand("ssh_docker_list_networks");
+    return result ? (result as NetworkInfo[]) : [];
   }, [invokeCommand]);
 
   const removeNetwork = useCallback(
@@ -246,7 +269,8 @@ export function useDockerApi() {
 
   // Volumes
   const listVolumes = useCallback(async (): Promise<VolumeInfo[]> => {
-    return (await invokeCommand("ssh_docker_list_volumes")) as VolumeInfo[];
+    const result = await invokeCommand("ssh_docker_list_volumes");
+    return result ? (result as VolumeInfo[]) : [];
   }, [invokeCommand]);
 
   const removeVolume = useCallback(

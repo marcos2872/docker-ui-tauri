@@ -4,12 +4,10 @@ import { ChevronDownIcon, ServerIcon } from "@heroicons/react/24/outline";
 
 export function ConnectionToggle() {
   const {
-    connectionType,
     currentSshConnection,
     availableSshConnections,
     isConnecting,
     connectionError,
-    setConnectionType,
     connectToSsh,
     refreshSshConnections,
   } = useDockerConnection();

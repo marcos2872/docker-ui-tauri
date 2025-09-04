@@ -49,8 +49,8 @@ async fn ssh_connect(
         password,
     };
 
-    // Use the create_connection method to store the connection persistently
-    let connection_id = ssh_client.create_connection(request).await?;
+    // Use the connect method to create actual SSH session
+    let connection_id = ssh_client.connect(request).await?;
 
     Ok(connection_id)
 }

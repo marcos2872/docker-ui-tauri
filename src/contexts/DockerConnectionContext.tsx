@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-export type ConnectionType = "ssh";
+export type ConnectionType = "ssh" | "local";
 
 export interface SshConnectionInfo {
   id: string;

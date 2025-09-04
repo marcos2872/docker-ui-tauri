@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import LineChartComponent from "../../components/LineChart";
 import MultiLineChartComponent from "../../components/MultiLineChart";
@@ -6,26 +5,34 @@ import {
   useMonitoring,
   useMonitoringStats,
 } from "../../contexts/MonitoringContext";
+import { useDockerApi } from "../../hooks/useDockerApi";
 
 interface DockerInfo {
   version: string;
-  containers: number;
-  containers_paused: number;
+  server_version: string;
+  containers_total: number;
   containers_running: number;
+  containers_paused: number;
   containers_stopped: number;
   images: number;
   architecture: string;
+  os: string;
+  kernel_version: string;
 }
 
 export function Dashboard() {
+  const { getDockerInfo } = useDockerApi();
   const [dockerInfo, setDockerInfo] = useState<DockerInfo>({
     version: "",
-    containers: 0,
-    containers_paused: 0,
+    server_version: "",
+    containers_total: 0,
     containers_running: 0,
+    containers_paused: 0,
     containers_stopped: 0,
     images: 0,
     architecture: "",
+    os: "",
+    kernel_version: "",
   });
 
   const {
@@ -51,12 +58,12 @@ export function Dashboard() {
 
   const getDockerStats = useCallback(async () => {
     try {
-      const status = (await invoke("docker_infos")) as DockerInfo;
+      const status = await getDockerInfo();
       setDockerInfo(status);
     } catch (error) {
       console.error("Error fetching docker stats:", error);
     }
-  }, []);
+  }, [getDockerInfo]);
 
   // Start monitoring when component mounts
   useEffect(() => {
@@ -80,7 +87,7 @@ export function Dashboard() {
   );
 
   const getMemoryUnit = () => {
-    const memoryLimitMB = currentSystemUsage.memory_usage / 1024 / 1024;
+    const memoryLimitMB = currentSystemUsage.images_total;
     return memoryLimitMB > 1024 ? "GB" : "MB";
   };
 
@@ -143,7 +150,10 @@ export function Dashboard() {
       <section className="w-full grid grid-cols-3 gap-2 lg:grid-cols-5">
         <Card title="Version" value={dockerInfo.version} />
         <Card title="Architecture" value={dockerInfo.architecture} />
-        <Card title="Containers" value={dockerInfo.containers.toString()} />
+        <Card
+          title="Containers"
+          value={dockerInfo.containers_total.toString()}
+        />
         <Card title="Images" value={dockerInfo.images.toString()} />
         <Card
           title="Containers Paused"

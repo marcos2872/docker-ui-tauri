@@ -141,7 +141,7 @@ export function CreateContainerModal({
 
     setLoading(true);
     try {
-      await invoke("docker_create_container", {
+      await invoke("ssh_docker_create_container", {
         request: {
           ...formData,
           command: formData.command || null,

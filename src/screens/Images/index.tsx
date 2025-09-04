@@ -29,7 +29,7 @@ export function Images() {
   const fetchImages = useCallback(async () => {
     try {
       setLoading(true);
-      const imageList: ImageInfo[] = await invoke("docker_list_images");
+      const imageList: ImageInfo[] = await invoke("ssh_docker_list_images");
       setImages(imageList);
     } catch (error) {
       console.error("Error fetching images:", error);
@@ -54,7 +54,7 @@ export function Images() {
     }
 
     try {
-      await invoke("docker_remove_image", { imageId });
+      await invoke("ssh_docker_remove_image", { imageId });
       showSuccess("Imagem removida com sucesso");
       await fetchImages();
     } catch (error) {

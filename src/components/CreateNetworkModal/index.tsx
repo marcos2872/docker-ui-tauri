@@ -32,7 +32,7 @@ export function CreateNetworkModal({
     setIsCreating(true);
 
     try {
-      await invoke("docker_create_network", {
+      await invoke("ssh_docker_create_network", {
         networkName: networkName.trim(),
         driver,
       });

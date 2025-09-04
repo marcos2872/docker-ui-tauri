@@ -33,7 +33,7 @@ export function PullImageModal({
 
     try {
       const fullImageName = tag ? `${imageName}:${tag}` : imageName;
-      await invoke("docker_pull_image", { imageName: fullImageName });
+      await invoke("ssh_docker_pull_image", { imageName: fullImageName });
 
       onShowSuccess(`Imagem ${fullImageName} baixada com sucesso`);
       onSuccess();

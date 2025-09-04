@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { useDockerApi } from "../../hooks/useDockerApi";
 
 interface IProps {
   changeScreen: (v: number) => void;
@@ -7,14 +7,20 @@ interface IProps {
 }
 
 export function NavBar({ changeScreen, screen }: IProps) {
+  const { getDockerStatus } = useDockerApi();
   const [status, setStatus] = useState("");
 
   useEffect(() => {
     (async () => {
-      const status: string = await invoke("docker_status");
-      setStatus(status);
+      try {
+        const status = (await getDockerStatus()) as string;
+        setStatus(status);
+      } catch (error) {
+        console.error("Error getting Docker status:", error);
+        setStatus("Error");
+      }
     })();
-  }, []);
+  }, [getDockerStatus]);
 
   return (
     <div className="flex flex-col justify-between w-32 p-3 h-full bg-gray-900 rounded-bl-lg">

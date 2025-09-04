@@ -32,7 +32,7 @@ export function CreateVolumeModal({
     setIsCreating(true);
 
     try {
-      await invoke("docker_create_volume", {
+      await invoke("ssh_docker_create_volume", {
         volumeName: volumeName.trim(),
         driver,
       });

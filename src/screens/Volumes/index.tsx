@@ -27,7 +27,7 @@ export function Volumes() {
   const fetchVolumes = useCallback(async () => {
     try {
       setLoading(true);
-      const volumeList: VolumeInfo[] = await invoke("docker_list_volumes");
+      const volumeList: VolumeInfo[] = await invoke("ssh_docker_list_volumes");
       setVolumes(volumeList);
     } catch (error) {
       console.error("Error fetching volumes:", error);
@@ -52,7 +52,7 @@ export function Volumes() {
     }
 
     try {
-      await invoke("docker_remove_volume", { volumeName });
+      await invoke("ssh_docker_remove_volume", { volumeName });
       showSuccess("Volume removido com sucesso");
       await fetchVolumes();
     } catch (error) {
