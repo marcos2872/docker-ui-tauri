@@ -246,11 +246,11 @@ export function Images() {
             </p>
           </div>
         ) : (
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-gray-800 rounded-lg overflow-hidden h-full">
+            <div className="overflow-auto max-h-full">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-gray-700 border-b border-gray-600">
+                  <tr className="bg-gray-700 border-b border-gray-600 sticky top-0">
                     <th className="px-6 py-4 text-sm font-medium text-gray-300">
                       Status
                     </th>

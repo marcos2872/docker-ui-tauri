@@ -309,31 +309,65 @@ impl<'a> SshDockerManager<'a> {
 
     // Lista todas as imagens via SSH
     pub async fn list_images(&self, connection_id: &str) -> Result<Vec<SshImageInfo>> {
+        // First get all container images to check usage
+        let containers_output = self
+            .ssh_client
+            .execute_command(connection_id, "docker ps -a --format '{{.Image}}'")
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Falha ao listar containers para verificar uso de imagens: {}",
+                    e
+                )
+            })?;
+
+        let used_images: std::collections::HashSet<String> = containers_output
+            .lines()
+            .map(|line| line.trim().to_string())
+            .collect();
+
         let output = self
             .ssh_client
             .execute_command(
                 connection_id,
-                "docker images --format '{{.ID}}|{{.Repository}}|{{.Tag}}|{{.CreatedAt}}|{{.Size}}' | while IFS='|' read -r id repo tag created size; do inuse=$([ $(docker ps -q --filter ancestor=\"$id\" | wc -l) -gt 0 ] && echo 'true' || echo 'false'); echo \"$id|$repo|$tag|$created|$size|$inuse\"; done",
+                "docker images -a --format '{{.ID}}|{{.Repository}}|{{.Tag}}|{{.CreatedAt}}|{{.Size}}'",
             )
             .await
             .map_err(|e| anyhow::anyhow!("Falha ao listar imagens: {}", e))?;
 
         let mut images = Vec::new();
         for line in output.lines() {
-            // Skip header
             if line.trim().is_empty() {
                 continue;
             }
 
             let parts: Vec<&str> = line.split('|').collect();
-            if parts.len() >= 6 {
+            if parts.len() >= 5 {
+                let repository = parts[1].trim();
+                let tag = parts[2].trim();
+                let id = parts[0].trim();
+
+                // Check if image is in use by checking different formats
+                let in_use = if repository == "<none>" || tag == "<none>" {
+                    // For images without proper names, check by ID (first 12 chars)
+                    let short_id = &id[..std::cmp::min(12, id.len())];
+                    used_images.contains(short_id) || used_images.contains(id)
+                } else {
+                    // For named images, check repository:tag format
+                    let full_name = format!("{}:{}", repository, tag);
+                    used_images.contains(&full_name)
+                        || used_images.contains(repository)
+                        || used_images.contains(&id[..std::cmp::min(12, id.len())])
+                        || used_images.contains(id)
+                };
+
                 images.push(SshImageInfo {
-                    id: parts[0].trim().to_string(),
-                    repository: parts[1].trim().to_string(),
-                    tag: parts[2].trim().to_string(),
+                    id: id.to_string(),
+                    repository: repository.to_string(),
+                    tag: tag.to_string(),
                     created: parts[3].trim().to_string(),
                     size: parts[4].trim().to_string(),
-                    in_use: parts[5].trim().to_string() == "true",
+                    in_use,
                 });
             }
         }
