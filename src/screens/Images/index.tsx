@@ -3,6 +3,7 @@ import { FaTrash, FaSearch, FaDownload, FaSync, FaImage } from "react-icons/fa";
 import { PullImageModal } from "../../components/PullImageModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
+import { format } from "date-fns";
 
 // Add a local extended interface to handle UI-specific properties
 interface ExtendedImageInfo extends ImageInfo {
@@ -63,18 +64,12 @@ export function Images() {
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "N/A";
     const date = new Date(dateString);
+    if (!dateString) return "N/A";
     if (isNaN(date.getTime())) {
-      return dateString;
+      return dateString.split("+")[0];
     }
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return format(dateString, "dd/MM/yyyy HH:mm:ss");
   };
 
   const formatSize = (sizeString: string) => {

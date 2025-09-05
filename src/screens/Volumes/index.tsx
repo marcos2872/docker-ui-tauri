@@ -252,19 +252,16 @@ export function Volumes() {
               <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-gray-700 border-b border-gray-600">
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-24">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Status
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-48">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Nome
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-20">
                       Driver
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-24">
-                      Containers
-                    </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-64">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Mount Point
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
@@ -303,15 +300,7 @@ export function Volumes() {
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {volume.driver}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {volume.containers_count > 0 ? (
-                          <span className="text-blue-400">
-                            {volume.containers_count}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">0</span>
-                        )}
-                      </td>
+
                       <td className="px-6 py-4 text-sm text-gray-300">
                         <div className="w-full">
                           <span

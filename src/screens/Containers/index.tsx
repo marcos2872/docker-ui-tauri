@@ -321,25 +321,25 @@ export function Containers() {
         ) : (
           <div className="bg-gray-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-gray-700 border-b border-gray-600">
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Status
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Nome
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Imagem
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-28">
                       Portas
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Criado
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-60">
                       Ações
                     </th>
                   </tr>
@@ -364,25 +364,49 @@ export function Containers() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-white font-medium">
-                          {container.name}
+                          <span
+                            title={container.name}
+                            className="block truncate"
+                          >
+                            {container.name}
+                          </span>
                         </div>
                         <div className="text-xs text-gray-400 font-mono">
                           {container.id.substring(0, 12)}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {container.image}
+                        <span
+                          title={container.image}
+                          className="block truncate"
+                        >
+                          {container.image}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {container.ports.length > 0
-                          ? container.ports.join(", ")
-                          : "N/A"}
+                        <span
+                          title={
+                            container.ports.length > 0
+                              ? container.ports.join(", ")
+                              : "N/A"
+                          }
+                          className="block truncate"
+                        >
+                          {container.ports.length > 0
+                            ? container.ports.join(", ")
+                            : "N/A"}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {formatDate(container.created)}
+                        <span
+                          title={container.created}
+                          className="block truncate"
+                        >
+                          {formatDate(container.created)}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           {container.state.toLowerCase() === "running" ? (
                             <>
                               <ActionButton
