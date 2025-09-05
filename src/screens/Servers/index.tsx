@@ -29,6 +29,7 @@ interface ServerData {
   label: string;
   port: number;
   user: string;
+  password?: string;
 }
 
 interface CommandExecutionModal {
@@ -112,6 +113,7 @@ export function Servers() {
         port: serverData.port,
         username: serverData.user,
         name: serverData.label,
+        password: serverData.password || null,
       });
       await refreshSshConnections();
       showSuccess(`Servidor ${serverData.label} adicionado com sucesso`);
@@ -122,17 +124,25 @@ export function Servers() {
   };
 
   const handleConnectServer = async (server: ServerInfo) => {
-    const password = prompt(
-      `Digite a senha para ${server.user}@${server.host}:`,
-    );
-    if (password === null) return;
-
     const connectionInfo = availableSshConnections.find(
       (c) =>
         c.host === server.host &&
         c.port === server.port &&
         c.username === server.user,
     );
+
+    let password = "";
+
+    // Check if password is saved
+    if (connectionInfo?.password) {
+      password = connectionInfo.password;
+    } else {
+      const promptPassword = prompt(
+        `Digite a senha para ${server.user}@${server.host}:`,
+      );
+      if (promptPassword === null) return;
+      password = promptPassword;
+    }
 
     if (connectionInfo) {
       const success = await connectToSsh(connectionInfo, password);
@@ -369,7 +379,7 @@ export function Servers() {
               <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-gray-700 border-b border-gray-600">
-                    <th className="px-4 py-4 text-sm font-medium text-gray-300 w-20">
+                    <th className="px-4 py-4 text-sm font-medium text-gray-300 w-28">
                       Status
                     </th>
                     <th className="px-4 py-4 text-sm font-medium text-gray-300 w-32">
@@ -402,7 +412,7 @@ export function Servers() {
                         className="hover:bg-gray-700 transition-colors"
                       >
                         <td className="px-4 py-4">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <div
                               className={`w-3 h-3 rounded-full ${
                                 isConnected ? "bg-green-400" : "bg-gray-400"

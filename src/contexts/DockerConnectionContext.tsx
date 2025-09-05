@@ -15,6 +15,7 @@ export interface SshConnectionInfo {
   host: string;
   port: number;
   username: string;
+  password: string | null;
 }
 
 interface DockerConnectionContextType {

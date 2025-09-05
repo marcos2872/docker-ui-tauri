@@ -31,7 +31,8 @@ pub struct SavedSshConnection {
     pub host: String,
     pub port: u16,
     pub username: String,
-    pub name: Option<String>, // Nome personalizado para a conexão
+    pub name: Option<String>,     // Nome personalizado para a conexão
+    pub password: Option<String>, // Senha salva (opcional)
 }
 
 struct SshConnection {

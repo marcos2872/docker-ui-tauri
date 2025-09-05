@@ -7,6 +7,7 @@ interface ServerData {
   label: string;
   port: number;
   user: string;
+  password?: string;
 }
 
 interface AddServerModalProps {
@@ -32,6 +33,7 @@ export function AddServerModal({
   });
   const [isConnecting, setIsConnecting] = useState(false);
   const [testPassword, setTestPassword] = useState("");
+  const [savePassword, setSavePassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +60,14 @@ export function AddServerModal({
       });
 
       onShowSuccess(`Conexão com ${serverData.label} estabelecida com sucesso`);
-      onSuccess(serverData);
+
+      // Include password if savePassword is checked
+      const serverDataToSave = {
+        ...serverData,
+        password: savePassword ? testPassword : undefined,
+      };
+
+      onSuccess(serverDataToSave);
       handleClose();
     } catch (error) {
       console.error("Error testing connection:", error);
@@ -77,6 +86,7 @@ export function AddServerModal({
         user: "",
       });
       setTestPassword("");
+      setSavePassword(false);
       onClose();
     }
   };
@@ -169,7 +179,7 @@ export function AddServerModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Senha (apenas para teste) *
+                Senha *
               </label>
               <input
                 type="password"
@@ -181,14 +191,37 @@ export function AddServerModal({
               />
             </div>
 
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="savePassword"
+                checked={savePassword}
+                onChange={(e) => setSavePassword(e.target.checked)}
+                disabled={isConnecting}
+                className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+              />
+              <label
+                htmlFor="savePassword"
+                className="ml-2 text-sm text-gray-300"
+              >
+                Salvar senha no servidor
+              </label>
+            </div>
+
             <div className="text-sm text-gray-400 space-y-1">
               <p>
                 A conexão será testada antes de adicionar o servidor à lista.
               </p>
-              <p className="text-yellow-400">
-                ⚠️ A senha é usada apenas para teste e não será salva por
-                segurança.
-              </p>
+              {savePassword ? (
+                <p className="text-yellow-400">
+                  ⚠️ A senha será salva localmente e usada para conexões
+                  automáticas.
+                </p>
+              ) : (
+                <p className="text-blue-400">
+                  ℹ️ A senha será solicitada a cada conexão.
+                </p>
+              )}
             </div>
           </div>
 

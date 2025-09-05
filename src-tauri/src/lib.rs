@@ -132,6 +132,7 @@ async fn ssh_add_saved_connection(
     port: u16,
     username: String,
     name: Option<String>,
+    password: Option<String>,
 ) -> Result<String, String> {
     let ssh_client = state.lock().await;
     let connection = SavedSshConnection {
@@ -139,6 +140,7 @@ async fn ssh_add_saved_connection(
         port,
         username,
         name,
+        password,
     };
     ssh_client.add_saved_connection(connection).await?;
     Ok("Conexão salva com sucesso".to_string())
