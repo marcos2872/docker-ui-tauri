@@ -13,18 +13,13 @@ import { CreateContainerModal } from "../../components/CreateContainerModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ContainerInfo } from "../../hooks/useDockerApi";
 
-interface ExtendedContainerInfo extends ContainerInfo {
-  ports: number[];
-  created: number;
-}
-
 type FilterType = "all" | "running" | "stopped" | "paused";
 
 export function Containers() {
-  const [containers, setContainers] = useState<ExtendedContainerInfo[]>([]);
-  const [filteredContainers, setFilteredContainers] = useState<
-    ExtendedContainerInfo[]
-  >([]);
+  const [containers, setContainers] = useState<ContainerInfo[]>([]);
+  const [filteredContainers, setFilteredContainers] = useState<ContainerInfo[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
@@ -44,15 +39,7 @@ export function Containers() {
     try {
       setLoading(true);
       const containerList = await listContainers();
-      // Convert ContainerInfo to ExtendedContainerInfo with default values
-      const extendedContainerList: ExtendedContainerInfo[] = containerList.map(
-        (container) => ({
-          ...container,
-          ports: [], // Default empty array since SSH API returns ports as string[]
-          created: Date.now() / 1000, // Default timestamp
-        }),
-      );
-      setContainers(extendedContainerList);
+      setContainers(containerList);
     } catch (error) {
       console.error("Error fetching containers:", error);
       showError("Erro ao buscar containers");
@@ -108,8 +95,13 @@ export function Containers() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("pt-BR", {
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return dateString;
+    }
+    return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -384,7 +376,7 @@ export function Containers() {
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {container.ports.length > 0
                           ? container.ports.join(", ")
-                          : "Nenhuma porta exposta"}
+                          : "N/A"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {formatDate(container.created)}

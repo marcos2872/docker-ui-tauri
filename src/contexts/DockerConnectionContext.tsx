@@ -93,46 +93,50 @@ export function DockerConnectionProvider({
   }, []);
 
   const connectToSsh = useCallback(
-    async (connectionId: string): Promise<boolean> => {
+    async (
+      connection: SshConnectionInfo,
+      password?: string,
+    ): Promise<boolean> => {
       setIsConnecting(true);
       setConnectionError(null);
 
       try {
-        // Find the connection info
-        const connectionInfo = availableSshConnections.find(
-          (conn) => conn.id === connectionId,
-        );
-
-        if (!connectionInfo) {
-          throw new Error("Connection not found");
-        }
-
-        // Test connection
-        const isConnected = await invoke("ssh_connect", {
-          connectionId: connectionId,
+        const newSessionId = await invoke<string>("ssh_connect", {
+          host: connection.host,
+          port: connection.port,
+          username: connection.username,
+          password: password || "",
         });
 
-        if (isConnected) {
-          setCurrentSshConnection(connectionInfo);
+        if (newSessionId) {
+          const activeConnection = {
+            ...connection,
+            id: newSessionId, // Overwrite the saved ID with the active session ID
+          };
+          setCurrentSshConnection(activeConnection);
           setConnectionType("ssh");
           localStorage.setItem(
             "docker-current-ssh-connection",
-            JSON.stringify(connectionInfo),
+            JSON.stringify(activeConnection),
           );
           return true;
         } else {
-          throw new Error("Failed to connect to SSH server");
+          throw new Error(
+            "Failed to connect to SSH server. The backend returned an empty session ID.",
+          );
         }
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error occurred";
+          error instanceof Error ? error.message : String(error);
         setConnectionError(errorMessage);
+        setCurrentSshConnection(null);
+        localStorage.removeItem("docker-current-ssh-connection");
         return false;
       } finally {
         setIsConnecting(false);
       }
     },
-    [availableSshConnections, setConnectionType],
+    [setConnectionType],
   );
 
   const disconnectFromSsh = useCallback(async () => {
@@ -164,41 +168,6 @@ export function DockerConnectionProvider({
       return false;
     }
   }, [connectionType, currentSshConnection]);
-
-  // Auto-connect to saved SSH connection on startup (only once)
-  useEffect(() => {
-    let hasAutoConnected = false;
-
-    const autoConnect = async () => {
-      if (
-        connectionType === "ssh" &&
-        currentSshConnection &&
-        availableSshConnections.length > 0 &&
-        !hasAutoConnected
-      ) {
-        hasAutoConnected = true;
-        const connectionExists = availableSshConnections.some(
-          (conn) => conn.id === currentSshConnection.id,
-        );
-
-        if (connectionExists) {
-          // Try to reconnect
-          const connected = await connectToSsh(currentSshConnection.id);
-          if (!connected) {
-            // If connection failed, switch to local
-            setConnectionType("local");
-          }
-        } else {
-          // Connection no longer exists, switch to local
-          setConnectionType("local");
-        }
-      }
-    };
-
-    if (availableSshConnections.length > 0) {
-      autoConnect();
-    }
-  }, [availableSshConnections.length]); // Remove dependencies that cause loops
 
   const value: DockerConnectionContextType = {
     connectionType,

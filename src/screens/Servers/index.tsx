@@ -8,23 +8,23 @@ import {
   FaTrash,
   FaSearch,
   FaTerminal,
-  FaEye,
   FaSync,
   FaEdit,
 } from "react-icons/fa";
 import { AddServerModal } from "../../components/AddServerModal";
 import { ToastContainer, useToast } from "../../components/Toast";
+import {
+  useDockerConnection,
+  SshConnectionInfo,
+} from "../../contexts/DockerConnectionContext";
 
+// Local interface for the list of SAVED servers
 interface ServerInfo {
   id: string;
   host: string;
   label: string;
   port: number;
   user: string;
-  password: string;
-  isConnected: boolean;
-  connectionId?: string;
-  lastConnected?: string;
 }
 
 interface ServerData {
@@ -32,22 +32,6 @@ interface ServerData {
   label: string;
   port: number;
   user: string;
-}
-
-interface SavedSshConnection {
-  host: string;
-  port: number;
-  username: string;
-  name?: string;
-}
-
-interface SshConnectionInfo {
-  host: string;
-  port: number;
-  username: string;
-  connection_id: string;
-  connected_at: number;
-  last_activity: number;
 }
 
 interface CommandExecutionModal {
@@ -65,13 +49,6 @@ export function Servers() {
   const [filteredServers, setFilteredServers] = useState<ServerInfo[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [sshConnections, setSshConnections] = useState<SshConnectionInfo[]>([]);
-  const [savedConnections, setSavedConnections] = useState<
-    SavedSshConnection[]
-  >([]);
-  const [connectingServerId, setConnectingServerId] = useState<string | null>(
-    null,
-  );
   const [commandModal, setCommandModal] = useState<CommandExecutionModal>({
     isOpen: false,
   });
@@ -84,71 +61,32 @@ export function Servers() {
   const [editingName, setEditingName] = useState("");
   const { toasts, removeToast, showSuccess, showError } = useToast();
 
-  // Load servers from saved connections and active SSH connections on component mount
+  const {
+    connectToSsh,
+    disconnectFromSsh,
+    currentSshConnection,
+    isConnecting,
+    connectionError,
+    refreshSshConnections,
+    availableSshConnections,
+  } = useDockerConnection();
+
   useEffect(() => {
-    loadSavedConnections();
-    loadSshConnections();
-  }, []);
+    const serversFromSaved = availableSshConnections.map((conn) => ({
+      id: `${conn.host}:${conn.port}:${conn.username}`,
+      host: conn.host,
+      label: conn.name || `${conn.username}@${conn.host}:${conn.port}`,
+      port: conn.port,
+      user: conn.username,
+    }));
+    setServers(serversFromSaved);
+  }, [availableSshConnections]);
 
-  // Load saved connections from backend
-  const loadSavedConnections = async () => {
-    try {
-      const connections = await invoke<SavedSshConnection[]>(
-        "ssh_get_saved_connections",
-      );
-      setSavedConnections(connections);
-
-      // Convert saved connections to server format
-      const servers = connections.map((conn) => ({
-        id: `${conn.host}:${conn.port}:${conn.username}`,
-        host: conn.host,
-        label: conn.name || `${conn.username}@${conn.host}:${conn.port}`,
-        port: conn.port,
-        user: conn.username,
-        password: "", // Password is never saved
-        isConnected: false,
-      }));
-
-      setServers(servers);
-    } catch (error) {
-      console.error("Error loading saved connections:", error);
-      showError("Erro ao carregar conexões salvas");
-    }
-  };
-
-  // Update server connection status based on SSH connections
   useEffect(() => {
-    setServers((prevServers) =>
-      prevServers.map((server) => {
-        const connection = sshConnections.find(
-          (conn) =>
-            conn.host === server.host &&
-            conn.port === server.port &&
-            conn.username === server.user,
-        );
-
-        return {
-          ...server,
-          isConnected: !!connection,
-          connectionId: connection?.connection_id,
-          lastConnected: connection
-            ? new Date(connection.connected_at * 1000).toISOString()
-            : server.lastConnected,
-        };
-      }),
-    );
-  }, [sshConnections]);
-
-  const loadSshConnections = async () => {
-    try {
-      const connections = await invoke<SshConnectionInfo[]>(
-        "ssh_list_connections",
-      );
-      setSshConnections(connections);
-    } catch (error) {
-      console.error("Error loading SSH connections:", error);
+    if (connectionError) {
+      showError(connectionError);
     }
-  };
+  }, [connectionError, showError]);
 
   const filterServers = useCallback(() => {
     let filtered = servers;
@@ -172,17 +110,13 @@ export function Servers() {
 
   const handleAddServer = async (serverData: ServerData) => {
     try {
-      // Save connection to backend (without password)
       await invoke<string>("ssh_add_saved_connection", {
         host: serverData.host,
         port: serverData.port,
         username: serverData.user,
         name: serverData.label,
       });
-
-      // Reload saved connections to update UI
-      await loadSavedConnections();
-
+      await refreshSshConnections();
       showSuccess(`Servidor ${serverData.label} adicionado com sucesso`);
     } catch (error) {
       console.error("Error adding server:", error);
@@ -190,83 +124,39 @@ export function Servers() {
     }
   };
 
-  const handleTestConnection = async (server: ServerInfo) => {
-    setConnectingServerId(server.id);
-
-    try {
-      const result = await invoke<string>("ssh_test_connection", {
-        host: server.host,
-        port: server.port,
-        username: server.user,
-        password: server.password,
-      });
-
-      showSuccess(`✅ ${result}`);
-    } catch (error) {
-      showError(`❌ Teste falhou: ${error}`);
-    } finally {
-      setConnectingServerId(null);
-    }
-  };
-
   const handleConnectServer = async (server: ServerInfo) => {
-    setConnectingServerId(server.id);
+    const password = prompt(
+      `Digite a senha para ${server.user}@${server.host}:`,
+    );
+    if (password === null) return;
 
-    try {
-      const connectionId = await invoke<string>("ssh_connect", {
-        host: server.host,
-        port: server.port,
-        username: server.user,
-        password: server.password,
-      });
+    const connectionInfo = availableSshConnections.find(
+      (c) =>
+        c.host === server.host &&
+        c.port === server.port &&
+        c.username === server.user,
+    );
 
-      showSuccess(
-        `Conectado ao servidor ${server.label} (ID: ${connectionId})`,
-      );
-      await loadSshConnections();
-    } catch (error) {
-      console.error("Error connecting to server:", error);
-      showError(`Erro ao conectar: ${error}`);
-    } finally {
-      setConnectingServerId(null);
+    if (connectionInfo) {
+      const success = await connectToSsh(connectionInfo, password);
+      if (success) {
+        showSuccess(`Conectado ao servidor ${server.label}`);
+      }
     }
   };
 
-  const handleDisconnectServer = async (server: ServerInfo) => {
-    if (!server.connectionId) {
-      showError("Nenhuma conexão ativa encontrada");
-      return;
-    }
-
-    setConnectingServerId(server.id);
-
-    try {
-      const result = await invoke<string>("ssh_disconnect", {
-        connectionId: server.connectionId,
-      });
-
-      showSuccess(`Desconectado: ${result}`);
-      await loadSshConnections();
-    } catch (error) {
-      console.error("Error disconnecting from server:", error);
-      showError(`Erro ao desconectar: ${error}`);
-    } finally {
-      setConnectingServerId(null);
-    }
-  };
-
-  const handleDisconnectAll = async () => {
-    try {
-      const result = await invoke<string>("ssh_disconnect_all");
-      showSuccess(`${result}`);
-      await loadSshConnections();
-    } catch (error) {
-      showError(`Erro ao desconectar todos: ${error}`);
-    }
+  const handleDisconnectServer = async () => {
+    await disconnectFromSsh();
+    showSuccess("Desconectado com sucesso.");
   };
 
   const handleRemoveServer = async (server: ServerInfo) => {
-    if (server.isConnected) {
+    const isConnected =
+      currentSshConnection?.host === server.host &&
+      currentSshConnection?.port === server.port &&
+      currentSshConnection?.username === server.user;
+
+    if (isConnected) {
       showError("Desconecte do servidor antes de removê-lo");
       return;
     }
@@ -278,16 +168,12 @@ export function Servers() {
     }
 
     try {
-      // Remove from backend
       await invoke<string>("ssh_remove_saved_connection", {
         host: server.host,
         port: server.port,
         username: server.user,
       });
-
-      // Reload saved connections to update UI
-      await loadSavedConnections();
-
+      await refreshSshConnections();
       showSuccess(`Servidor ${server.label} removido`);
     } catch (error) {
       console.error("Error removing server:", error);
@@ -296,7 +182,12 @@ export function Servers() {
   };
 
   const handleOpenCommandModal = (server: ServerInfo) => {
-    if (!server.isConnected || !server.connectionId) {
+    const isConnected =
+      currentSshConnection?.host === server.host &&
+      currentSshConnection?.port === server.port &&
+      currentSshConnection?.username === server.user;
+
+    if (!isConnected) {
       showError("Servidor não está conectado");
       return;
     }
@@ -334,8 +225,7 @@ export function Servers() {
         username: editModal.server.user,
         name: editingName.trim(),
       });
-
-      await loadSavedConnections();
+      await refreshSshConnections();
       handleCloseEditModal();
       showSuccess("Nome da conexão atualizado com sucesso");
     } catch (error) {
@@ -345,7 +235,7 @@ export function Servers() {
   };
 
   const handleExecuteCommand = async () => {
-    if (!commandModal.server?.connectionId || !command.trim()) {
+    if (!commandModal.server || !command.trim() || !currentSshConnection) {
       showError("Conexão ou comando inválido");
       return;
     }
@@ -354,7 +244,7 @@ export function Servers() {
 
     try {
       const output = await invoke<string>("ssh_execute_command", {
-        connectionId: commandModal.server.connectionId,
+        connectionId: currentSshConnection.id,
         command: command.trim(),
       });
 
@@ -365,38 +255,6 @@ export function Servers() {
       showError(`Erro ao executar comando: ${error}`);
     } finally {
       setIsExecutingCommand(false);
-    }
-  };
-
-  const handleCleanupConnections = async () => {
-    try {
-      const removedCount = await invoke<number>(
-        "ssh_cleanup_inactive_connections",
-        {
-          maxIdleMinutes: 30,
-        },
-      );
-
-      showSuccess(`${removedCount} conexões inativas removidas`);
-      await loadSshConnections();
-    } catch (error) {
-      showError(`Erro na limpeza: ${error}`);
-    }
-  };
-
-  const formatLastConnected = (dateString?: string) => {
-    if (!dateString) return "Nunca";
-
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "Nunca";
     }
   };
 
@@ -452,32 +310,14 @@ export function Servers() {
         <h1 className="text-2xl font-bold text-white">Servidores SSH</h1>
         <div className="flex gap-2">
           <button
-            onClick={() => {
-              loadSshConnections();
-              loadSavedConnections();
-            }}
+            onClick={refreshSshConnections}
             className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors"
-            title="Atualizar conexões"
+            title="Atualizar conexões salvas"
           >
             <FaSync className="w-4 h-4" />
             Atualizar
           </button>
-          <button
-            onClick={handleCleanupConnections}
-            className="flex items-center gap-2 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-500 transition-colors"
-            title="Limpar conexões inativas"
-          >
-            <FaTrash className="w-4 h-4" />
-            Limpeza
-          </button>
-          <button
-            onClick={handleDisconnectAll}
-            className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors"
-            title="Desconectar todos"
-          >
-            <FaStop className="w-4 h-4" />
-            Desconectar Todos
-          </button>
+
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors"
@@ -502,10 +342,10 @@ export function Servers() {
         </div>
         <div className="flex gap-4 text-sm text-gray-400">
           <span className="text-blue-400">
-            {savedConnections.length} servidor(es) salvo(s)
+            {availableSshConnections.length} servidor(es) salvo(s)
           </span>
           <span className="text-green-400">
-            {sshConnections.length} conexão(ões) ativa(s)
+            {currentSshConnection ? "1 conexão ativa" : "Nenhuma conexão ativa"}
           </span>
         </div>
       </div>
@@ -547,170 +387,128 @@ export function Servers() {
                     <th className="px-2 py-4 text-sm font-medium text-gray-300 w-16">
                       User
                     </th>
-                    <th className="px-2 py-4 text-sm font-medium text-gray-300 w-24">
-                      Conexão
-                    </th>
                     <th className="px-4 py-4 text-sm font-medium text-gray-300 w-48">
                       Ações
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-600">
-                  {filteredServers.map((server) => (
-                    <tr
-                      key={server.id}
-                      className="hover:bg-gray-700 transition-colors"
-                    >
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              server.isConnected
-                                ? "bg-green-400"
-                                : "bg-gray-400"
-                            }`}
-                          ></div>
-                          <span
-                            className={`text-sm font-medium ${
-                              server.isConnected
-                                ? "text-green-400"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {server.isConnected ? "Conectado" : "Desconectado"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm text-white font-medium">
-                          <span title={server.label} className="block truncate">
-                            {server.label}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm text-gray-300">
-                          <span title={server.host} className="block truncate">
-                            {server.host}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-4 text-sm text-gray-300">
-                        {server.port}
-                      </td>
-                      <td className="px-2 py-4 text-sm text-gray-300">
-                        {server.user}
-                      </td>
-                      <td className="px-2 py-4 text-sm text-gray-300">
-                        {formatLastConnected(server.lastConnected)}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {!server.isConnected ? (
-                            <>
+                  {filteredServers.map((server) => {
+                    const isConnected =
+                      currentSshConnection?.host === server.host &&
+                      currentSshConnection?.port === server.port &&
+                      currentSshConnection?.username === server.user;
+
+                    return (
+                      <tr
+                        key={server.id}
+                        className="hover:bg-gray-700 transition-colors"
+                      >
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={`w-3 h-3 rounded-full ${
+                                isConnected ? "bg-green-400" : "bg-gray-400"
+                              }`}
+                            ></div>
+                            <span
+                              className={`text-sm font-medium ${
+                                isConnected ? "text-green-400" : "text-gray-400"
+                              }`}
+                            >
+                              {isConnected ? "Conectado" : "Desconectado"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-sm text-white font-medium">
+                            <span
+                              title={server.label}
+                              className="block truncate"
+                            >
+                              {server.label}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-sm text-gray-300">
+                            <span
+                              title={server.host}
+                              className="block truncate"
+                            >
+                              {server.host}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-2 py-4 text-sm text-gray-300">
+                          {server.port}
+                        </td>
+                        <td className="px-2 py-4 text-sm text-gray-300">
+                          {server.user}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {!isConnected ? (
                               <ActionButton
-                                onClick={() => {
-                                  if (!server.password) {
-                                    const password = prompt(
-                                      `Digite a senha para ${server.user}@${server.host}:`,
-                                    );
-                                    if (password) {
-                                      const serverWithPassword = {
-                                        ...server,
-                                        password,
-                                      };
-                                      handleTestConnection(serverWithPassword);
-                                    }
-                                  } else {
-                                    handleTestConnection(server);
-                                  }
-                                }}
-                                icon={FaEye}
-                                className="hover:bg-blue-600"
-                                disabled={connectingServerId === server.id}
-                                title="Testar conexão"
-                              >
-                                {connectingServerId === server.id
-                                  ? "Testando..."
-                                  : "Testar"}
-                              </ActionButton>
-                              <ActionButton
-                                onClick={() => {
-                                  if (!server.password) {
-                                    const password = prompt(
-                                      `Digite a senha para ${server.user}@${server.host}:`,
-                                    );
-                                    if (password) {
-                                      const serverWithPassword = {
-                                        ...server,
-                                        password,
-                                      };
-                                      handleConnectServer(serverWithPassword);
-                                    }
-                                  } else {
-                                    handleConnectServer(server);
-                                  }
-                                }}
+                                onClick={() => handleConnectServer(server)}
                                 icon={FaPlay}
                                 className="hover:bg-green-600"
-                                disabled={connectingServerId === server.id}
+                                disabled={isConnecting}
                                 title="Conectar ao servidor"
                               >
-                                {connectingServerId === server.id
-                                  ? "Conectando..."
-                                  : "Conectar"}
+                                {isConnecting ? "Conectando..." : "Conectar"}
                               </ActionButton>
-                            </>
-                          ) : (
-                            <>
-                              <ActionButton
-                                onClick={() => handleOpenCommandModal(server)}
-                                icon={FaTerminal}
-                                className="hover:bg-blue-600"
-                                title="Executar comandos"
-                              >
-                                Terminal
-                              </ActionButton>
-                              <ActionButton
-                                onClick={() => handleDisconnectServer(server)}
-                                icon={FaStop}
-                                className="hover:bg-red-600"
-                                disabled={connectingServerId === server.id}
-                                title="Desconectar do servidor"
-                              >
-                                {connectingServerId === server.id
-                                  ? "Desconectando..."
-                                  : "Desconectar"}
-                              </ActionButton>
-                            </>
-                          )}
+                            ) : (
+                              <>
+                                <ActionButton
+                                  onClick={() => handleOpenCommandModal(server)}
+                                  icon={FaTerminal}
+                                  className="hover:bg-blue-600"
+                                  title="Executar comandos"
+                                >
+                                  Terminal
+                                </ActionButton>
+                                <ActionButton
+                                  onClick={handleDisconnectServer}
+                                  icon={FaStop}
+                                  className="hover:bg-red-600"
+                                  disabled={isConnecting}
+                                  title="Desconectar do servidor"
+                                >
+                                  {isConnecting
+                                    ? "Desconectando..."
+                                    : "Desconectar"}
+                                </ActionButton>
+                              </>
+                            )}
 
-                          <ActionButton
-                            onClick={() => handleOpenEditModal(server)}
-                            icon={FaEdit}
-                            className="hover:bg-yellow-600"
-                            title="Editar nome da conexão"
-                          >
-                            Editar
-                          </ActionButton>
+                            <ActionButton
+                              onClick={() => handleOpenEditModal(server)}
+                              icon={FaEdit}
+                              className="hover:bg-yellow-600"
+                              title="Editar nome da conexão"
+                            >
+                              Editar
+                            </ActionButton>
 
-                          <ActionButton
-                            onClick={() => handleRemoveServer(server)}
-                            icon={FaTrash}
-                            className="hover:bg-red-600"
-                            disabled={server.isConnected}
-                            title={
-                              server.isConnected
-                                ? "Desconecte antes de remover"
-                                : "Remover servidor"
-                            }
-                          >
-                            Remover
-                          </ActionButton>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <ActionButton
+                              onClick={() => handleRemoveServer(server)}
+                              icon={FaTrash}
+                              className="hover:bg-red-600"
+                              disabled={isConnected}
+                              title={
+                                isConnected
+                                  ? "Desconecte antes de remover"
+                                  : "Remover servidor"
+                              }
+                            >
+                              Remover
+                            </ActionButton>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -795,7 +593,7 @@ export function Servers() {
             <div className="flex justify-end">
               <button
                 onClick={handleCloseCommandModal}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 transition-colors"
+                className="text-gray-400 hover:text-white text-xl"
               >
                 Fechar
               </button>
