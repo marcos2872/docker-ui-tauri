@@ -26,6 +26,7 @@ export interface ImageInfo {
   tag: string;
   created: string;
   size: string;
+  in_use: boolean;
 }
 
 export interface NetworkInfo {

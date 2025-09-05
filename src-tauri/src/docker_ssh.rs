@@ -22,6 +22,7 @@ pub struct SshImageInfo {
     pub tag: String,
     pub created: String,
     pub size: String,
+    pub in_use: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -310,26 +311,27 @@ impl<'a> SshDockerManager<'a> {
             .ssh_client
             .execute_command(
                 connection_id,
-                "docker images --format 'table {{.ID}}|{{.Repository}}|{{.Tag}}|{{.CreatedAt}}|{{.Size}}'",
+                "docker images --format '{{.ID}}|{{.Repository}}|{{.Tag}}|{{.CreatedAt}}|{{.Size}}' | while IFS='|' read -r id repo tag created size; do inuse=$([ $(docker ps -q --filter ancestor=\"$id\" | wc -l) -gt 0 ] && echo 'true' || echo 'false'); echo \"$id|$repo|$tag|$created|$size|$inuse\"; done",
             )
             .await
             .map_err(|e| anyhow::anyhow!("Falha ao listar imagens: {}", e))?;
 
         let mut images = Vec::new();
-        for line in output.lines().skip(1) {
+        for line in output.lines() {
             // Skip header
             if line.trim().is_empty() {
                 continue;
             }
 
             let parts: Vec<&str> = line.split('|').collect();
-            if parts.len() >= 5 {
+            if parts.len() >= 6 {
                 images.push(SshImageInfo {
                     id: parts[0].trim().to_string(),
                     repository: parts[1].trim().to_string(),
                     tag: parts[2].trim().to_string(),
                     created: parts[3].trim().to_string(),
                     size: parts[4].trim().to_string(),
+                    in_use: parts[5].trim().to_string() == "true",
                 });
             }
         }

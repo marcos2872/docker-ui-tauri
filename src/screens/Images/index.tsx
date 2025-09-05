@@ -6,7 +6,6 @@ import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
 
 // Add a local extended interface to handle UI-specific properties
 interface ExtendedImageInfo extends ImageInfo {
-  containers: string;
   in_use: boolean;
 }
 
@@ -27,11 +26,8 @@ export function Images() {
     try {
       setLoading(true);
       const imageList = await listImages();
-      // The backend doesn't provide container count per image, so we add it here with a default.
       const extendedImageList: ExtendedImageInfo[] = imageList.map((image) => ({
         ...image,
-        containers: "0", // Default value
-        in_use: false, // Default value
       }));
       setImages(extendedImageList);
     } catch (error) {
@@ -270,9 +266,6 @@ export function Images() {
                       Tag
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300">
-                      Containers
-                    </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
                       Tamanho
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300">
@@ -311,15 +304,6 @@ export function Images() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {image.tag || "<none>"}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {parseInt(image.containers, 10) > 0 ? (
-                          <span className="text-blue-400">
-                            {image.containers}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">0</span>
-                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {formatSize(image.size)}
