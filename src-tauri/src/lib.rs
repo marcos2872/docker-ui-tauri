@@ -218,12 +218,17 @@ async fn ssh_docker_list_containers(
     state: State<'_, SshClientState>,
     connection_id: String,
 ) -> Result<Vec<SshContainerInfo>, String> {
+    println!("teste 001");
     let ssh_client = state.lock().await;
     let manager = SshDockerManager::new(&*ssh_client);
-    manager
+    let containeres = manager
         .list_containers(&connection_id)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+
+    println!("{:?}", containeres);
+
+    containeres
 }
 
 #[tauri::command]

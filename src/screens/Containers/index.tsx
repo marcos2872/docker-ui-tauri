@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import {
   FaPlay,
@@ -12,13 +11,9 @@ import {
 } from "react-icons/fa";
 import { CreateContainerModal } from "../../components/CreateContainerModal";
 import { ToastContainer, useToast } from "../../components/Toast";
+import { useDockerApi, ContainerInfo } from "../../hooks/useDockerApi";
 
-interface ContainerInfo {
-  id: string;
-  name: string;
-  image: string;
-  state: string;
-  status: string;
+interface ExtendedContainerInfo extends ContainerInfo {
   ports: number[];
   created: number;
 }
@@ -26,31 +21,45 @@ interface ContainerInfo {
 type FilterType = "all" | "running" | "stopped" | "paused";
 
 export function Containers() {
-  const [containers, setContainers] = useState<ContainerInfo[]>([]);
-  const [filteredContainers, setFilteredContainers] = useState<ContainerInfo[]>(
-    [],
-  );
+  const [containers, setContainers] = useState<ExtendedContainerInfo[]>([]);
+  const [filteredContainers, setFilteredContainers] = useState<
+    ExtendedContainerInfo[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const {
+    listContainers,
+    startContainer,
+    stopContainer,
+    pauseContainer,
+    unpauseContainer,
+    removeContainer,
+  } = useDockerApi();
 
   const fetchContainers = useCallback(async () => {
     try {
       setLoading(true);
-      const containerList: ContainerInfo[] = await invoke(
-        "ssh_docker_list_containers",
+      const containerList = await listContainers();
+      // Convert ContainerInfo to ExtendedContainerInfo with default values
+      const extendedContainerList: ExtendedContainerInfo[] = containerList.map(
+        (container) => ({
+          ...container,
+          ports: [], // Default empty array since SSH API returns ports as string[]
+          created: Date.now() / 1000, // Default timestamp
+        }),
       );
-      setContainers(containerList);
+      setContainers(extendedContainerList);
     } catch (error) {
       console.error("Error fetching containers:", error);
       showError("Erro ao buscar containers");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [listContainers]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -60,28 +69,26 @@ export function Containers() {
 
   const handleContainerAction = async (containerId: string, action: string) => {
     try {
-      let command = "";
       switch (action) {
         case "start":
-          command = "ssh_docker_start_container";
+          await startContainer(containerId);
           break;
         case "stop":
-          command = "ssh_docker_stop_container";
+          await stopContainer(containerId);
           break;
         case "pause":
-          command = "ssh_docker_pause_container";
+          await pauseContainer(containerId);
           break;
         case "unpause":
-          command = "ssh_docker_unpause_container";
+          await unpauseContainer(containerId);
           break;
         case "remove":
-          command = "ssh_docker_remove_container";
+          await removeContainer(containerId);
           break;
         default:
           return;
       }
 
-      await invoke(command, { containerId });
       await fetchContainers();
 
       const actionMessages = {
