@@ -269,9 +269,6 @@ export function Images() {
                       Tag
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300">
-                      Containers
-                    </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
                       Tamanho
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300">
@@ -300,9 +297,14 @@ export function Images() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4  max-w-32">
                         <div className="text-sm text-white font-medium">
-                          {image.repository}
+                          <span
+                            title={image.repository}
+                            className="block truncate"
+                          >
+                            {image.repository}
+                          </span>
                         </div>
                         <div className="text-xs text-gray-400 font-mono">
                           {image.id.substring(0, 12)}
@@ -310,15 +312,6 @@ export function Images() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {image.tag || "<none>"}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {image.containers > 0 ? (
-                          <span className="text-blue-400">
-                            {image.containers}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">0</span>
-                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {formatSize(image.size)}

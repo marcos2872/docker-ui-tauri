@@ -532,7 +532,7 @@ export function Servers() {
               <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-gray-700 border-b border-gray-600">
-                    <th className="px-4 py-4 text-sm font-medium text-gray-300 w-20">
+                    <th className="px-4 py-4 text-sm font-medium text-gray-300 w-28">
                       Status
                     </th>
                     <th className="px-4 py-4 text-sm font-medium text-gray-300 w-32">

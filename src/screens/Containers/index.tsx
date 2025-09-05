@@ -367,9 +367,14 @@ export function Containers() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 max-w-32">
                         <div className="text-sm text-white font-medium">
-                          {container.name}
+                          <span
+                            title={container.name}
+                            className="block truncate"
+                          >
+                            {container.name}{" "}
+                          </span>
                         </div>
                         <div className="text-xs text-gray-400 font-mono">
                           {container.id.substring(0, 12)}
@@ -381,7 +386,7 @@ export function Containers() {
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {container.ports.length > 0
                           ? container.ports.join(", ")
-                          : "Nenhuma porta exposta"}
+                          : "- : -"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {formatDate(container.created)}
