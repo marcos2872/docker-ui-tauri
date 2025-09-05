@@ -34,12 +34,14 @@ export interface NetworkInfo {
   name: string;
   driver: string;
   scope: string;
+  in_use: boolean;
 }
 
 export interface VolumeInfo {
   name: string;
   driver: string;
   mountpoint: string;
+  in_use: boolean;
 }
 
 export interface DockerInfo {

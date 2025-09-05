@@ -5,8 +5,7 @@ import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, VolumeInfo } from "../../hooks/useDockerApi";
 
 interface ExtendedVolumeInfo extends VolumeInfo {
-  created: string;
-  containers_count: number;
+  in_use: boolean;
 }
 
 type FilterType = "all" | "in_use" | "unused";
@@ -29,13 +28,7 @@ export function Volumes() {
       setLoading(true);
       const volumeList = await listVolumes();
       // Convert VolumeInfo to ExtendedVolumeInfo with default values
-      const extendedVolumeList: ExtendedVolumeInfo[] = volumeList.map(
-        (volume) => ({
-          ...volume,
-          created: new Date().toISOString(),
-          containers_count: 0,
-        }),
-      );
+      const extendedVolumeList: ExtendedVolumeInfo[] = volumeList;
       setVolumes(extendedVolumeList);
     } catch (error) {
       console.error("Error fetching volumes:", error);
@@ -54,7 +47,7 @@ export function Volumes() {
   const handleRemoveVolume = async (volumeName: string) => {
     const volume = volumes.find((vol) => vol.name === volumeName);
 
-    if (volume && volume.containers_count > 0) {
+    if (volume && volume.in_use) {
       showError("Não é possível remover um volume em uso por containers");
       return;
     }
@@ -66,21 +59,6 @@ export function Volumes() {
     } catch (error) {
       console.error("Error removing volume:", error);
       showError("Erro ao remover volume");
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return dateString;
     }
   };
 
@@ -104,9 +82,9 @@ export function Volumes() {
       filtered = filtered.filter((volume) => {
         switch (activeFilter) {
           case "in_use":
-            return volume.containers_count > 0;
+            return volume.in_use;
           case "unused":
-            return volume.containers_count === 0;
+            return !volume.in_use;
           default:
             return true;
         }
@@ -176,8 +154,8 @@ export function Volumes() {
   );
 
   const getFilterCounts = () => {
-    const inUse = volumes.filter((vol) => vol.containers_count > 0).length;
-    const unused = volumes.filter((vol) => vol.containers_count === 0).length;
+    const inUse = volumes.filter((vol) => vol.in_use).length;
+    const unused = volumes.filter((vol) => !vol.in_use).length;
 
     return { all: volumes.length, in_use: inUse, unused };
   };
@@ -255,17 +233,14 @@ export function Volumes() {
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Status
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-48">
                       Nome
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-20">
                       Driver
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-48">
                       Mount Point
-                    </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
-                      Criado
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-20">
                       Ações
@@ -281,12 +256,12 @@ export function Volumes() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getUsageDot(volume.containers_count > 0)}`}
+                            className={`w-3 h-3 rounded-full ${getUsageDot(volume.in_use)}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getUsageColor(volume.containers_count > 0)}`}
+                            className={`text-sm font-medium ${getUsageColor(volume.in_use)}`}
                           >
-                            {volume.containers_count > 0 ? "Em uso" : "Sem uso"}
+                            {volume.in_use ? "Em uso" : "Sem uso"}
                           </span>
                         </div>
                       </td>
@@ -311,18 +286,15 @@ export function Volumes() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {formatDate(volume.created)}
-                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <ActionButton
                             onClick={() => handleRemoveVolume(volume.name)}
                             icon={FaTrash}
                             className="hover:bg-red-600"
-                            disabled={volume.containers_count > 0}
+                            disabled={volume.in_use}
                             title={
-                              volume.containers_count > 0
+                              volume.in_use
                                 ? "Não é possível remover um volume em uso"
                                 : "Remover volume"
                             }

@@ -38,6 +38,7 @@ pub struct SshVolumeInfo {
     pub name: String,
     pub driver: String,
     pub mountpoint: String,
+    pub in_use: bool,
 }
 
 // Status possíveis do Docker via SSH
@@ -426,13 +427,14 @@ impl<'a> SshDockerManager<'a> {
             .ssh_client
             .execute_command(
                 connection_id,
-                "docker volume ls --format 'table {{.Name}}|{{.Driver}}|{{.Mountpoint}}'",
+                "docker volume ls --format '{{.Name}}|{{.Driver}}|{{.Mountpoint}}' | while IFS='|' read -r name driver mountpoint; do inuse=$(docker inspect \"$name\" --format '{{.Options.device}}' 2>/dev/null | grep -q . && docker ps -q | xargs -r docker inspect --format '{{range .Mounts}}{{.Name}}{{end}}' 2>/dev/null | grep -q \"^$name$\" && echo 'true' || echo 'false'); echo \"$name|$driver|$mountpoint|$inuse\"; done",
             )
             .await
             .map_err(|e| anyhow::anyhow!("Falha ao listar volumes: {}", e))?;
 
+        println!("{:?}", output);
         let mut volumes = Vec::new();
-        for line in output.lines().skip(1) {
+        for line in output.lines() {
             // Skip header
             if line.trim().is_empty() {
                 continue;
@@ -444,6 +446,7 @@ impl<'a> SshDockerManager<'a> {
                     name: parts[0].trim().to_string(),
                     driver: parts[1].trim().to_string(),
                     mountpoint: parts[2].trim().to_string(),
+                    in_use: parts[3].trim().to_string() == "true",
                 });
             }
         }
