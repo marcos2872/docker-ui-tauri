@@ -31,6 +31,7 @@ pub struct SshNetworkInfo {
     pub name: String,
     pub driver: String,
     pub scope: String,
+    pub in_use: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -366,30 +367,29 @@ impl<'a> SshDockerManager<'a> {
             .ssh_client
             .execute_command(
                 connection_id,
-                "docker network ls --format 'table {{.ID}}|{{.Name}}|{{.Driver}}|{{.Scope}}'",
+                r#"docker network ls --format '{{.ID}}|{{.Name}}|{{.Driver}}|{{.Scope}}' | while IFS='|' read -r id name driver scope; do inuse=$(docker network inspect "$id" --format '{{range .Containers}}{{.Name}}{{"\n"}}{{end}}' 2>/dev/null | grep -q . && echo 'true' || echo 'false'); echo "$id|$name|$driver|$scope|$inuse"; done"#,
             )
             .await
             .map_err(|e| anyhow::anyhow!("Falha ao listar networks: {}", e))?;
 
         let mut networks = Vec::new();
-        for line in output.lines().skip(1) {
+        for line in output.lines() {
             // Skip header
             if line.trim().is_empty() {
                 continue;
             }
 
             let parts: Vec<&str> = line.split('|').collect();
-            if parts.len() >= 4 {
+            if parts.len() >= 5 {
                 let name = parts[1].trim();
                 // Filtrar networks de sistema
-                if !matches!(name, "bridge" | "host" | "none") {
-                    networks.push(SshNetworkInfo {
-                        id: parts[0].trim().to_string(),
-                        name: name.to_string(),
-                        driver: parts[2].trim().to_string(),
-                        scope: parts[3].trim().to_string(),
-                    });
-                }
+                networks.push(SshNetworkInfo {
+                    id: parts[0].trim().to_string(),
+                    name: name.to_string(),
+                    driver: parts[2].trim().to_string(),
+                    scope: parts[3].trim().to_string(),
+                    in_use: parts[4].trim().to_string() == "true",
+                });
             }
         }
 
@@ -432,7 +432,6 @@ impl<'a> SshDockerManager<'a> {
             .await
             .map_err(|e| anyhow::anyhow!("Falha ao listar volumes: {}", e))?;
 
-        println!("{:?}", output);
         let mut volumes = Vec::new();
         for line in output.lines() {
             // Skip header

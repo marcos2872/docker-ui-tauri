@@ -11,8 +11,6 @@ import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, NetworkInfo } from "../../hooks/useDockerApi";
 
 interface ExtendedNetworkInfo extends NetworkInfo {
-  created: string;
-  containers_count: number;
   is_system: boolean;
 }
 
@@ -39,8 +37,6 @@ export function Networks() {
       const extendedNetworkList: ExtendedNetworkInfo[] = networkList.map(
         (network) => ({
           ...network,
-          created: new Date().toISOString(),
-          containers_count: 0,
           is_system:
             network.name === "bridge" ||
             network.name === "host" ||
@@ -70,7 +66,7 @@ export function Networks() {
       return;
     }
 
-    if (network && network.containers_count > 0) {
+    if (network && network.in_use) {
       showError("Não é possível remover uma network com containers conectados");
       return;
     }
@@ -273,7 +269,7 @@ export function Networks() {
               <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-gray-700 border-b border-gray-600">
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-24">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-28">
                       Tipo
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
@@ -287,9 +283,6 @@ export function Networks() {
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       ID
-                    </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
-                      Criada
                     </th>
                     <th className="px-6 py-4 text-sm font-medium text-gray-300 w-20">
                       Ações
@@ -337,22 +330,17 @@ export function Networks() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {formatDate(network.created)}
-                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <ActionButton
                             onClick={() => handleRemoveNetwork(network.id)}
                             icon={FaTrash}
                             className="hover:bg-red-600"
-                            disabled={
-                              network.is_system || network.containers_count > 0
-                            }
+                            disabled={network.is_system || network.in_use}
                             title={
                               network.is_system
                                 ? "Não é possível remover uma network do sistema"
-                                : network.containers_count > 0
+                                : network.in_use
                                   ? "Não é possível remover uma network com containers conectados"
                                   : "Remover network"
                             }
