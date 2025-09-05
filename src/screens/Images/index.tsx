@@ -4,10 +4,9 @@ import { PullImageModal } from "../../components/PullImageModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
 
+// Add a local extended interface to handle UI-specific properties
 interface ExtendedImageInfo extends ImageInfo {
-  created: number;
-  size: number;
-  containers: number;
+  containers: string;
   in_use: boolean;
 }
 
@@ -28,13 +27,11 @@ export function Images() {
     try {
       setLoading(true);
       const imageList = await listImages();
-      // Convert ImageInfo to ExtendedImageInfo with default values
+      // The backend doesn't provide container count per image, so we add it here with a default.
       const extendedImageList: ExtendedImageInfo[] = imageList.map((image) => ({
         ...image,
-        created: Date.now(),
-        size: 0,
-        containers: 0,
-        in_use: false,
+        containers: "0", // Default value
+        in_use: false, // Default value
       }));
       setImages(extendedImageList);
     } catch (error) {
@@ -65,12 +62,17 @@ export function Images() {
       await fetchImages();
     } catch (error) {
       console.error("Error removing image:", error);
-      showError("Erro ao remover imagem");
+      showError(`Erro ao remover imagem: ${error}`);
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("pt-BR", {
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return dateString;
+    }
+    return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -79,11 +81,8 @@ export function Images() {
     });
   };
 
-  const formatSize = (bytes: number) => {
-    const sizes = ["B", "KB", "MB", "GB", "TB"];
-    if (bytes === 0) return "0 B";
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+  const formatSize = (sizeString: string) => {
+    return sizeString || "0 B";
   };
 
   const getImageName = (repository: string, tag: string) => {
@@ -314,7 +313,7 @@ export function Images() {
                         {image.tag || "<none>"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {image.containers > 0 ? (
+                        {parseInt(image.containers, 10) > 0 ? (
                           <span className="text-blue-400">
                             {image.containers}
                           </span>

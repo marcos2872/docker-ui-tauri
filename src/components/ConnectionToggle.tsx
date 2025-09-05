@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useDockerConnection } from "../contexts/DockerConnectionContext";
+import {
+  useDockerConnection,
+  SshConnectionInfo,
+} from "../contexts/DockerConnectionContext";
 import { ChevronDownIcon, ServerIcon } from "@heroicons/react/24/outline";
 
 export function ConnectionToggle() {
@@ -16,8 +19,15 @@ export function ConnectionToggle() {
 
   // Removed handleLocalConnection since we only support SSH connections
 
-  const handleSshConnection = async (connectionId: string) => {
-    const success = await connectToSsh(connectionId);
+  const handleSshConnection = async (connection: SshConnectionInfo) => {
+    const password = prompt(
+      `Enter password for ${connection.username}@${connection.host}:`,
+    );
+    if (password === null) {
+      // User clicked cancel
+      return;
+    }
+    const success = await connectToSsh(connection, password);
     if (success) {
       setIsDropdownOpen(false);
     }
@@ -68,7 +78,7 @@ export function ConnectionToggle() {
               {availableSshConnections.map((connection) => (
                 <button
                   key={connection.id}
-                  onClick={() => handleSshConnection(connection.id)}
+                  onClick={() => handleSshConnection(connection)}
                   disabled={isConnecting}
                   className={`
                     w-full px-3 py-2 text-left hover:bg-gray-700

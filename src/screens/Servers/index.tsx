@@ -13,10 +13,7 @@ import {
 } from "react-icons/fa";
 import { AddServerModal } from "../../components/AddServerModal";
 import { ToastContainer, useToast } from "../../components/Toast";
-import {
-  useDockerConnection,
-  SshConnectionInfo,
-} from "../../contexts/DockerConnectionContext";
+import { useDockerConnection } from "../../contexts/DockerConnectionContext";
 
 // Local interface for the list of SAVED servers
 interface ServerInfo {

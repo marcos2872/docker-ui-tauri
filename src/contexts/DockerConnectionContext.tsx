@@ -24,7 +24,10 @@ interface DockerConnectionContextType {
   connectionError: string | null;
   availableSshConnections: SshConnectionInfo[];
   setConnectionType: (type: ConnectionType) => void;
-  connectToSsh: (connectionId: string) => Promise<boolean>;
+  connectToSsh: (
+    connection: SshConnectionInfo,
+    password?: string,
+  ) => Promise<boolean>;
   disconnectFromSsh: () => Promise<void>;
   refreshSshConnections: () => Promise<void>;
   isDockerAvailable: () => Promise<boolean>;
