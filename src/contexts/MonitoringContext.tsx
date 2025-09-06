@@ -9,10 +9,14 @@ import React, {
 import { useDockerApi } from "../hooks/useDockerApi";
 
 interface DockerSystemUsage {
-  containers_running: number;
-  containers_total: number;
-  images_total: number;
-  system_info: string;
+  cpu_online: number;
+  cpu_usage: number;
+  memory_usage: number;
+  memory_limit: number;
+  network_rx_bytes: number;
+  network_tx_bytes: number;
+  block_read_bytes: number;
+  block_write_bytes: number;
 }
 
 interface CpuDataPoint {
@@ -31,10 +35,17 @@ interface NetworkDataPoint {
   tx: number;
 }
 
+interface BlockDataPoint {
+  time: string;
+  read: number;
+  write: number;
+}
+
 interface MonitoringContextType {
   cpuHistory: CpuDataPoint[];
   memoryHistory: MemoryDataPoint[];
   networkHistory: NetworkDataPoint[];
+  blockHistory: BlockDataPoint[];
   currentSystemUsage: DockerSystemUsage;
   isMonitoring: boolean;
   dataPointsCount: number;
@@ -61,6 +72,7 @@ const loadFromStorage = () => {
         cpuHistory: parsed.cpuHistory || [],
         memoryHistory: parsed.memoryHistory || [],
         networkHistory: parsed.networkHistory || [],
+        blockHistory: parsed.blockHistory || [],
         lastUpdate: parsed.lastUpdate ? new Date(parsed.lastUpdate) : null,
       };
     }
@@ -71,6 +83,7 @@ const loadFromStorage = () => {
     cpuHistory: [],
     memoryHistory: [],
     networkHistory: [],
+    blockHistory: [],
     lastUpdate: null,
   };
 };
@@ -88,12 +101,19 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
   const [networkHistory, setNetworkHistory] = useState<NetworkDataPoint[]>(
     savedData.networkHistory,
   );
+  const [blockHistory, setBlockHistory] = useState<BlockDataPoint[]>(
+    savedData.blockHistory,
+  );
   const [currentSystemUsage, setCurrentSystemUsage] =
     useState<DockerSystemUsage>({
-      containers_running: 0,
-      containers_total: 0,
-      images_total: 0,
-      system_info: "",
+      cpu_online: 0,
+      cpu_usage: 0,
+      memory_usage: 0,
+      memory_limit: 0,
+      network_rx_bytes: 0,
+      network_tx_bytes: 0,
+      block_read_bytes: 0,
+      block_write_bytes: 0,
     });
 
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -107,6 +127,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
       cpuHistory: CpuDataPoint[];
       memoryHistory: MemoryDataPoint[];
       networkHistory: NetworkDataPoint[];
+      blockHistory: BlockDataPoint[];
       lastUpdate: Date;
     }) => {
       try {
@@ -116,6 +137,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
             cpuHistory: data.cpuHistory,
             memoryHistory: data.memoryHistory,
             networkHistory: data.networkHistory,
+            blockHistory: data.blockHistory,
             lastUpdate: data.lastUpdate.toISOString(),
           }),
         );
@@ -140,23 +162,22 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
         second: "2-digit",
       });
 
-      // Add CPU data to history
+      // Add CPU data to history (from actual system usage)
       setCpuHistory((prev) => {
-        const cpuPercentage = systemUsage.containers_running;
         const newHistory = [
           ...prev,
           {
             time: timeStr,
-            value: cpuPercentage * 0.01,
+            value: systemUsage.cpu_usage,
           },
         ];
 
         return newHistory.slice(-120); // Keep last 120 points (2 minutes at 1-second intervals)
       });
 
-      // Add Memory data to history (in MB)
+      // Add Memory data to history (convert bytes to MB)
       setMemoryHistory((prev) => {
-        const memoryUsageMB = systemUsage.containers_total;
+        const memoryUsageMB = systemUsage.memory_usage / (1024 * 1024);
         const newHistory = [
           ...prev,
           {
@@ -168,14 +189,28 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
         return newHistory.slice(-120);
       });
 
-      // Add Network data to history (RX and TX separate in bytes)
+      // Add Network data to history (actual bytes)
       setNetworkHistory((prev) => {
         const newHistory = [
           ...prev,
           {
             time: timeStr,
-            rx: systemUsage.images_total,
-            tx: systemUsage.containers_total,
+            rx: systemUsage.network_rx_bytes,
+            tx: systemUsage.network_tx_bytes,
+          },
+        ];
+
+        return newHistory.slice(-120);
+      });
+
+      // Add Block I/O data to history (actual bytes)
+      setBlockHistory((prev) => {
+        const newHistory = [
+          ...prev,
+          {
+            time: timeStr,
+            read: systemUsage.block_read_bytes,
+            write: systemUsage.block_write_bytes,
           },
         ];
 
@@ -191,28 +226,41 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     if (
       cpuHistory.length > 0 ||
       memoryHistory.length > 0 ||
-      networkHistory.length > 0
+      networkHistory.length > 0 ||
+      blockHistory.length > 0
     ) {
       saveToStorage({
         cpuHistory,
         memoryHistory,
         networkHistory,
+        blockHistory,
         lastUpdate: lastUpdate || new Date(),
       });
     }
-  }, [cpuHistory, memoryHistory, networkHistory, lastUpdate, saveToStorage]);
+  }, [
+    cpuHistory,
+    memoryHistory,
+    networkHistory,
+    blockHistory,
+    lastUpdate,
+    saveToStorage,
+  ]);
 
   const startMonitoring = useCallback(() => {
-    if (!isMonitoring) {
-      setIsMonitoring(true);
-
-      // Collect initial data
-      collectData();
-
-      // Set up interval
-      intervalRef.current = setInterval(collectData, 1000);
+    // Always stop existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
-  }, [isMonitoring, collectData]);
+
+    setIsMonitoring(true);
+
+    // Collect initial data
+    collectData();
+
+    // Set up interval
+    intervalRef.current = setInterval(collectData, 1000);
+  }, [collectData]);
 
   const stopMonitoring = useCallback(() => {
     if (isMonitoring) {
@@ -229,6 +277,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     setCpuHistory([]);
     setMemoryHistory([]);
     setNetworkHistory([]);
+    setBlockHistory([]);
     setLastUpdate(null);
 
     // Clear from localStorage
@@ -239,25 +288,32 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     }
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup on unmount and ensure monitoring state consistency
   useEffect(() => {
+    // If we have saved data but no active interval, reset monitoring state
+    if (isMonitoring && !intervalRef.current) {
+      setIsMonitoring(false);
+    }
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, []);
+  }, [isMonitoring]);
 
   const value: MonitoringContextType = {
     cpuHistory,
     memoryHistory,
     networkHistory,
+    blockHistory,
     currentSystemUsage,
     isMonitoring,
     dataPointsCount: Math.max(
       cpuHistory.length,
       memoryHistory.length,
       networkHistory.length,
+      blockHistory.length,
     ),
     lastUpdate,
     startMonitoring,
@@ -286,53 +342,55 @@ export function useMonitoringStats() {
     cpuHistory,
     memoryHistory,
     networkHistory,
+    blockHistory,
     currentSystemUsage,
     dataPointsCount,
   } = useMonitoring();
 
-  const formatMemoryValue = (bytes: number, unit: "MB" | "GB" = "MB") => {
-    if (unit === "GB") {
-      return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-    }
-    return `${(bytes / 1024 / 1024).toFixed(0)} MB`;
-  };
+  const formatBytes = (bytes: number, decimals: number = 1) => {
+    if (bytes === 0) return "0 B";
 
-  const formatNetworkValue = (bytes: number) => {
-    if (bytes >= 1024 * 1024 * 1024) {
-      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-    } else if (bytes >= 1024 * 1024) {
-      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    } else {
-      return `${(bytes / 1024).toFixed(2)} KB`;
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const value = bytes / Math.pow(k, i);
+
+    // Para bytes, não mostramos decimais
+    if (i === 0) {
+      return `${value} ${sizes[i]}`;
     }
+
+    return `${value.toFixed(decimals)} ${sizes[i]}`;
   };
 
   const getCpuMaxValue = () => {
-    const cpuOnlineMax = currentSystemUsage.containers_total * 10;
-
     if (cpuHistory.length === 0) {
-      return Math.min(100, cpuOnlineMax);
+      return Math.max(100, currentSystemUsage.cpu_online * 100 || 100);
     }
 
     const historyMax = Math.max(...cpuHistory.map((point) => point.value));
-    const maxValueWith10Percent = historyMax * 0.01;
-    const maxValue = Math.min(maxValueWith10Percent, cpuOnlineMax);
+    const maxValueWith10Percent = historyMax + historyMax * 0.1;
 
-    return Math.max(maxValue, 0.1);
+    return Math.max(
+      Math.min(
+        maxValueWith10Percent,
+        currentSystemUsage.cpu_online * 100 || 100,
+      ),
+      50,
+    );
   };
 
   const getMemoryMaxValue = () => {
-    const memoryLimitMB = currentSystemUsage.containers_total * 100;
-
     if (memoryHistory.length === 0) {
-      return memoryLimitMB > 0 ? memoryLimitMB : 1024;
+      return currentSystemUsage.memory_limit / (1024 * 1024); // Convert to MB
     }
 
     const historyMax = Math.max(...memoryHistory.map((point) => point.value));
     const maxValueWith10Percent = historyMax + historyMax * 0.1;
-    const maxValue = Math.min(maxValueWith10Percent, memoryLimitMB);
+    const memoryLimitMB = currentSystemUsage.memory_limit / (1024 * 1024);
 
-    return Math.max(maxValue, 100);
+    return Math.max(Math.min(maxValueWith10Percent, memoryLimitMB), 512); // Minimum 512MB
   };
 
   const getNetworkConfig = () => {
@@ -375,6 +433,49 @@ export function useMonitoringStats() {
     return { unit, maxValue, data: convertedData };
   };
 
+  const getBlockConfig = () => {
+    if (blockHistory.length === 0) {
+      return { unit: "KB", maxValue: 10, data: [] };
+    }
+
+    const allValues = blockHistory.flatMap((point) => [
+      point.read,
+      point.write,
+    ]);
+    const maxBytes = Math.max(...allValues);
+
+    let unit: string, divisor: number;
+    if (maxBytes >= 1024 * 1024 * 1024) {
+      unit = "GB";
+      divisor = 1024 * 1024 * 1024;
+    } else if (maxBytes >= 1024 * 1024) {
+      unit = "MB";
+      divisor = 1024 * 1024;
+    } else {
+      unit = "KB";
+      divisor = 1024;
+    }
+
+    const convertedData = blockHistory.map((point) => ({
+      time: point.time,
+      read: point.read / divisor,
+      write: point.write / divisor,
+    }));
+
+    const convertedValues = convertedData.flatMap((point) => [
+      point.read,
+      point.write,
+    ]);
+    const historyMax = Math.max(...convertedValues);
+    const maxValueWith10Percent = historyMax + historyMax * 0.1;
+    const maxValue = Math.max(
+      maxValueWith10Percent,
+      unit === "GB" ? 0.1 : unit === "MB" ? 1 : 10,
+    );
+
+    return { unit, maxValue, data: convertedData };
+  };
+
   const getHistoryDuration = () => {
     const minutes = Math.floor(dataPointsCount / 60);
     const seconds = dataPointsCount % 60;
@@ -386,6 +487,7 @@ export function useMonitoringStats() {
     cpuHistory,
     memoryHistory,
     networkHistory,
+    blockHistory,
     currentSystemUsage,
     dataPointsCount,
 
@@ -393,15 +495,16 @@ export function useMonitoringStats() {
     cpuMaxValue: getCpuMaxValue(),
     memoryMaxValue: getMemoryMaxValue(),
     networkConfig: getNetworkConfig(),
+    blockConfig: getBlockConfig(),
     historyDuration: getHistoryDuration(),
 
     // Formatters
-    formatMemoryValue,
-    formatNetworkValue,
+    formatBytes,
 
     // Titles
-    cpuTitle: `Containers Running: ${currentSystemUsage.containers_running} | Total: ${currentSystemUsage.containers_total}`,
-    memoryTitle: `Images: ${currentSystemUsage.images_total}`,
-    networkTitle: `System: ${currentSystemUsage.system_info || "Docker via SSH"}`,
+    cpuTitle: `CPU ${currentSystemUsage.cpu_usage.toFixed(2)}% / ${currentSystemUsage.cpu_online} cores`,
+    memoryTitle: `Memory ${formatBytes(currentSystemUsage.memory_usage, 2)} - ${formatBytes(currentSystemUsage.memory_limit, 2)} total`,
+    networkTitle: `Network I/O - RX/TX`,
+    blockTitle: `Block I/O - Read/Write`,
   };
 }

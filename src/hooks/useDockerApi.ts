@@ -4,10 +4,14 @@ import { useDockerConnection } from "../contexts/DockerConnectionContext";
 
 // Tipos SSH adaptados para compatibilidade
 export interface DockerSystemUsage {
-  containers_running: number;
-  containers_total: number;
-  images_total: number;
-  system_info: string;
+  cpu_online: number;
+  cpu_usage: number;
+  memory_usage: number;
+  memory_limit: number;
+  network_rx_bytes: number;
+  network_tx_bytes: number;
+  block_read_bytes: number;
+  block_write_bytes: number;
 }
 
 export interface ContainerInfo {
@@ -135,10 +139,14 @@ export function useDockerApi() {
       return result
         ? (result as DockerSystemUsage)
         : {
-            containers_running: 0,
-            containers_total: 0,
-            images_total: 0,
-            system_info: "No SSH Connection",
+            cpu_online: 0,
+            cpu_usage: 0,
+            memory_usage: 0,
+            memory_limit: 0,
+            network_rx_bytes: 0,
+            network_tx_bytes: 0,
+            block_read_bytes: 0,
+            block_write_bytes: 0,
           };
     }, [invokeCommand]);
 

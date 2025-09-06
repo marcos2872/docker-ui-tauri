@@ -6,6 +6,7 @@ import {
   useMonitoringStats,
 } from "../../contexts/MonitoringContext";
 import { useDockerApi } from "../../hooks/useDockerApi";
+import { useDockerConnection } from "../../contexts/DockerConnectionContext";
 
 interface DockerInfo {
   version: string;
@@ -22,6 +23,7 @@ interface DockerInfo {
 
 export function Dashboard() {
   const { getDockerInfo } = useDockerApi();
+  const { currentSshConnection, connectionType } = useDockerConnection();
   const [dockerInfo, setDockerInfo] = useState<DockerInfo>({
     version: "",
     server_version: "",
@@ -51,9 +53,11 @@ export function Dashboard() {
     cpuMaxValue,
     memoryMaxValue,
     networkConfig,
+    blockConfig,
     cpuTitle,
     memoryTitle,
     networkTitle,
+    blockTitle,
   } = useMonitoringStats();
 
   const getDockerStats = useCallback(async () => {
@@ -87,26 +91,39 @@ export function Dashboard() {
   );
 
   const getMemoryUnit = () => {
-    const memoryLimitMB = currentSystemUsage.images_total;
-    return memoryLimitMB > 1024 ? "GB" : "MB";
+    const maxMemory = memoryMaxValue;
+    return maxMemory > 1024 ? "GB" : "MB";
   };
 
   return (
-    <div className="flex flex-col w-full p-4 justify-center gap-6">
+    <div className="grid grid-rows-[auto_auto_1fr] w-full p-4 pb-10 gap-6 h-screen overflow-hidden">
       {/* Header with Monitoring Controls */}
       <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          {lastUpdate && (
-            <div className="flex items-center gap-4 text-sm text-gray-400">
+          <div className="flex items-center gap-4 text-sm text-gray-400">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full ${currentSshConnection ? "bg-green-400" : "bg-red-400"}`}
+              ></div>
               <span>
-                Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
-              </span>
-              <span className="text-yellow-400">
-                {Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s atrás
+                {currentSshConnection
+                  ? `SSH: ${currentSshConnection.name || currentSshConnection.host}`
+                  : "No SSH Connection"}
               </span>
             </div>
-          )}
+            {lastUpdate && (
+              <>
+                <span>
+                  Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
+                </span>
+                <span className="text-yellow-400">
+                  {Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s
+                  atrás
+                </span>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-4 text-sm text-gray-300">
@@ -169,7 +186,7 @@ export function Dashboard() {
         />
       </section>
 
-      <section className="w-full h-full flex flex-col gap-4 overflow-y-auto max-h-[calc(100vh-282px)] mb-10">
+      <section className="w-full flex flex-col gap-4 overflow-y-auto min-h-0">
         <LineChartComponent
           data={cpuHistory}
           dataKey="value"
@@ -213,6 +230,21 @@ export function Dashboard() {
           maxDataPoints={120}
           minValue={0}
           maxValue={networkConfig.maxValue}
+        />
+
+        <MultiLineChartComponent
+          data={blockConfig.data}
+          dataKeys={["read", "write"]}
+          title={blockTitle}
+          colors={["#8b5cf6", "#ef4444"]}
+          height={300}
+          unit={blockConfig.unit}
+          showGrid={true}
+          showTooltip={true}
+          showLegend={true}
+          maxDataPoints={120}
+          minValue={0}
+          maxValue={blockConfig.maxValue}
         />
       </section>
     </div>

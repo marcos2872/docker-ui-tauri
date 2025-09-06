@@ -80,10 +80,14 @@ pub struct SshDockerInfo {
 // Uso do sistema Docker via SSH
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SshDockerSystemUsage {
-    pub containers_running: i32,
-    pub containers_total: i32,
-    pub images_total: i32,
-    pub system_info: String,
+    pub cpu_online: u64,
+    pub cpu_usage: f64,
+    pub memory_usage: u64,
+    pub memory_limit: u64,
+    pub network_rx_bytes: u64,
+    pub network_tx_bytes: u64,
+    pub block_read_bytes: u64,
+    pub block_write_bytes: u64,
 }
 
 // Estrutura para criar um novo container via SSH
@@ -543,28 +547,139 @@ impl<'a> SshDockerManager<'a> {
         &self,
         connection_id: &str,
     ) -> Result<SshDockerSystemUsage> {
+        // Get running containers
         let containers = self.list_containers(connection_id).await?;
-        let running_containers = containers
+        let running_containers: Vec<&SshContainerInfo> = containers
             .iter()
             .filter(|c| c.state.to_lowercase() == "running")
-            .count() as i32;
+            .collect();
 
-        let images = self.list_images(connection_id).await?;
-        let images_count = images.len() as i32;
+        // Initialize totals
+        let mut total_cpu = 0.0;
+        let mut total_memory_usage = 0u64;
+        let mut total_network_rx = 0u64;
+        let mut total_network_tx = 0u64;
+        let mut total_block_read = 0u64;
+        let mut total_block_write = 0u64;
 
-        // Obtém informações do sistema
-        let system_info = self
+        // Get system information
+        let cpu_info = self
             .ssh_client
-            .execute_command(connection_id, "uname -a")
+            .execute_command(connection_id, "nproc")
             .await
-            .unwrap_or_else(|_| "Sistema desconhecido".to_string());
+            .unwrap_or_else(|_| "1".to_string());
+        let cpu_online = cpu_info.trim().parse::<u64>().unwrap_or(1);
+
+        let memory_info = self
+            .ssh_client
+            .execute_command(connection_id, "free -b | grep '^Mem:' | awk '{print $2}'")
+            .await
+            .unwrap_or_else(|_| "1073741824".to_string()); // Default 1GB
+        let memory_limit = memory_info.trim().parse::<u64>().unwrap_or(1073741824);
+
+        // Collect stats for each running container
+        for container in running_containers {
+            // Get container stats using docker stats --no-stream
+            let stats_output = self
+                .ssh_client
+                .execute_command(
+                    connection_id,
+                    &format!(
+                        "docker stats {} --no-stream --format '{{{{.CPUPerc}}}}|{{{{.MemUsage}}}}|{{{{.NetIO}}}}|{{{{.BlockIO}}}}'",
+                        container.name
+                    ),
+                )
+                .await;
+
+            if let Ok(stats) = stats_output {
+                let parts: Vec<&str> = stats.trim().split('|').collect();
+                if parts.len() >= 4 {
+                    // Parse CPU percentage
+                    if let Ok(cpu_str) = parts[0].replace('%', "").parse::<f64>() {
+                        total_cpu += cpu_str;
+                    }
+
+                    // Parse memory usage (format: "used / limit")
+                    if let Some(mem_used) = parts[1].split(" / ").next() {
+                        if let Ok(mem_bytes) = self.parse_memory_size(mem_used) {
+                            total_memory_usage += mem_bytes;
+                        }
+                    }
+
+                    // Parse network I/O (format: "rx / tx")
+                    let network_parts: Vec<&str> = parts[2].split(" / ").collect();
+                    if network_parts.len() >= 2 {
+                        if let Ok(rx_bytes) = self.parse_memory_size(network_parts[0]) {
+                            total_network_rx += rx_bytes;
+                        }
+                        if let Ok(tx_bytes) = self.parse_memory_size(network_parts[1]) {
+                            total_network_tx += tx_bytes;
+                        }
+                    }
+
+                    // Parse block I/O (format: "read / write")
+                    let block_parts: Vec<&str> = parts[3].split(" / ").collect();
+                    if block_parts.len() >= 2 {
+                        if let Ok(read_bytes) = self.parse_memory_size(block_parts[0]) {
+                            total_block_read += read_bytes;
+                        }
+                        if let Ok(write_bytes) = self.parse_memory_size(block_parts[1]) {
+                            total_block_write += write_bytes;
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(SshDockerSystemUsage {
-            containers_running: running_containers,
-            containers_total: containers.len() as i32,
-            images_total: images_count,
-            system_info: system_info.trim().to_string(),
+            cpu_online,
+            cpu_usage: total_cpu,
+            memory_usage: total_memory_usage,
+            memory_limit,
+            network_rx_bytes: total_network_rx,
+            network_tx_bytes: total_network_tx,
+            block_read_bytes: total_block_read,
+            block_write_bytes: total_block_write,
         })
+    }
+
+    // Helper function to parse memory sizes (e.g., "1.5GB", "512MB", "2048B")
+    fn parse_memory_size(&self, size_str: &str) -> Result<u64> {
+        let size_str = size_str.trim();
+        let (number_str, unit) = if size_str.ends_with("GB") || size_str.ends_with("GiB") {
+            (
+                &size_str[..size_str.len() - if size_str.ends_with("GiB") { 3 } else { 2 }],
+                "GB",
+            )
+        } else if size_str.ends_with("MB") || size_str.ends_with("MiB") {
+            (
+                &size_str[..size_str.len() - if size_str.ends_with("MiB") { 3 } else { 2 }],
+                "MB",
+            )
+        } else if size_str.ends_with("KB") || size_str.ends_with("KiB") {
+            (
+                &size_str[..size_str.len() - if size_str.ends_with("KiB") { 3 } else { 2 }],
+                "KB",
+            )
+        } else if size_str.ends_with('B') {
+            (&size_str[..size_str.len() - 1], "B")
+        } else {
+            (size_str, "B")
+        };
+
+        let number: f64 = number_str
+            .parse()
+            .map_err(|_| anyhow::anyhow!("Invalid number format"))?;
+
+        let bytes = match unit {
+            "GB" => (number * 1024.0 * 1024.0 * 1024.0) as u64,
+            "MB" => (number * 1024.0 * 1024.0) as u64,
+            "KB" => (number * 1024.0) as u64,
+            "B" => number as u64,
+            _ => return Err(anyhow::anyhow!("Unknown unit")),
+        };
+
+        Ok(bytes)
     }
 
     // Cria um novo container via SSH
