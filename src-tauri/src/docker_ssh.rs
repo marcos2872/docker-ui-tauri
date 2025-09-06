@@ -547,13 +547,6 @@ impl<'a> SshDockerManager<'a> {
         &self,
         connection_id: &str,
     ) -> Result<SshDockerSystemUsage> {
-        // Get running containers
-        let containers = self.list_containers(connection_id).await?;
-        let running_containers: Vec<&SshContainerInfo> = containers
-            .iter()
-            .filter(|c| c.state.to_lowercase() == "running")
-            .collect();
-
         // Initialize totals
         let mut total_cpu = 0.0;
         let mut total_memory_usage = 0u64;
@@ -577,25 +570,25 @@ impl<'a> SshDockerManager<'a> {
             .unwrap_or_else(|_| "1073741824".to_string()); // Default 1GB
         let memory_limit = memory_info.trim().parse::<u64>().unwrap_or(1073741824);
 
-        // Collect stats for each running container
-        for container in running_containers {
-            // Get container stats using docker stats --no-stream
-            let stats_output = self
-                .ssh_client
-                .execute_command(
-                    connection_id,
-                    &format!(
-                        "docker stats {} --no-stream --format '{{{{.CPUPerc}}}}|{{{{.MemUsage}}}}|{{{{.NetIO}}}}|{{{{.BlockIO}}}}'",
-                        container.name
-                    ),
-                )
-                .await;
+        // Get stats for all running containers in one command
+        let stats_output = self
+            .ssh_client
+            .execute_command(
+                connection_id,
+                "docker stats --no-stream --format '{{.CPUPerc}}|{{.MemUsage}}|{{.NetIO}}|{{.BlockIO}}'",
+            )
+            .await;
 
-            if let Ok(stats) = stats_output {
-                let parts: Vec<&str> = stats.trim().split('|').collect();
+        if let Ok(stats) = stats_output {
+            for line in stats.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+
+                let parts: Vec<&str> = line.trim().split('|').collect();
                 if parts.len() >= 4 {
                     // Parse CPU percentage
-                    if let Ok(cpu_str) = parts[0].replace('%', "").parse::<f64>() {
+                    if let Ok(cpu_str) = parts[0].replace('%', "").trim().parse::<f64>() {
                         total_cpu += cpu_str;
                     }
 
