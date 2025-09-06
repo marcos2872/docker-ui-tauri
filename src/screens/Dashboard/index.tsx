@@ -22,7 +22,7 @@ interface DockerInfo {
 }
 
 export function Dashboard() {
-  const { getDockerInfo } = useDockerApi();
+  const { getDockerInfo, listImages } = useDockerApi();
   const { currentSshConnection, connectionType } = useDockerConnection();
   const [dockerInfo, setDockerInfo] = useState<DockerInfo>({
     version: "",
@@ -60,12 +60,19 @@ export function Dashboard() {
 
   const getDockerStats = useCallback(async () => {
     try {
-      const status = await getDockerInfo();
-      setDockerInfo(status);
+      const [status, imageList] = await Promise.all([
+        getDockerInfo(),
+        listImages(),
+      ]);
+
+      setDockerInfo({
+        ...status,
+        images: imageList.length,
+      });
     } catch (error) {
       console.error("Error fetching docker stats:", error);
     }
-  }, [getDockerInfo]);
+  }, [getDockerInfo, listImages]);
 
   // Start monitoring when component mounts and resume when entering dashboard
   useEffect(() => {
