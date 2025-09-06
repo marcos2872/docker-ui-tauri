@@ -38,13 +38,11 @@ export function Dashboard() {
   });
 
   const {
-    currentSystemUsage,
     isMonitoring,
     dataPointsCount,
-    lastUpdate,
     startMonitoring,
-    stopMonitoring,
     clearHistory,
+    resumeMonitoring,
   } = useMonitoring();
 
   const {
@@ -69,19 +67,20 @@ export function Dashboard() {
     }
   }, [getDockerInfo]);
 
-  // Start monitoring when component mounts
+  // Start monitoring when component mounts and resume when entering dashboard
   useEffect(() => {
     getDockerStats();
     startMonitoring();
+    resumeMonitoring(); // Resume monitoring when entering dashboard
 
     // Set up interval for docker stats (less frequent than system usage)
     const statsInterval = setInterval(getDockerStats, 5000);
 
     return () => {
       clearInterval(statsInterval);
-      // Don't stop monitoring when component unmounts - keep it running
+      // Note: Don't stop monitoring when component unmounts - keep it running
     };
-  }, [getDockerStats, startMonitoring]);
+  }, [getDockerStats, startMonitoring, resumeMonitoring]);
 
   const Card = ({ title, value }: { title: string; value: string }) => (
     <div className="min-w-40 flex flex-col justify-center items-center bg-gray-700 p-2 rounded-lg text-white">
@@ -112,17 +111,6 @@ export function Dashboard() {
                   : "No SSH Connection"}
               </span>
             </div>
-            {lastUpdate && (
-              <>
-                <span>
-                  Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
-                </span>
-                <span className="text-yellow-400">
-                  {Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s
-                  atrás
-                </span>
-              </>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
@@ -143,16 +131,6 @@ export function Dashboard() {
             )}
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={isMonitoring ? stopMonitoring : startMonitoring}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isMonitoring
-                  ? "bg-red-600 hover:bg-red-500 text-white"
-                  : "bg-green-600 hover:bg-green-500 text-white"
-              }`}
-            >
-              {isMonitoring ? "Parar" : "Iniciar"} Monitoramento
-            </button>
             <button
               onClick={clearHistory}
               disabled={dataPointsCount === 0}

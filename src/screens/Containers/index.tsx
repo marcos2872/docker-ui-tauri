@@ -12,6 +12,7 @@ import {
 import { CreateContainerModal } from "../../components/CreateContainerModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ContainerInfo } from "../../hooks/useDockerApi";
+import { useMonitoring } from "../../contexts/MonitoringContext";
 
 type FilterType = "all" | "running" | "stopped" | "paused";
 

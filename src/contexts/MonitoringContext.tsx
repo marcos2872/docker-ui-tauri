@@ -53,6 +53,8 @@ interface MonitoringContextType {
   startMonitoring: () => void;
   stopMonitoring: () => void;
   clearHistory: () => void;
+  pauseMonitoring: () => void;
+  resumeMonitoring: () => void;
 }
 
 const MonitoringContext = createContext<MonitoringContextType | undefined>(
@@ -117,6 +119,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     });
 
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(
     savedData.lastUpdate,
   );
@@ -149,6 +152,9 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
   );
 
   const collectData = useCallback(async () => {
+    // Skip data collection if monitoring is paused
+    if (isPaused) return;
+
     try {
       const systemUsage = await getDockerSystemUsage();
       setCurrentSystemUsage(systemUsage);
@@ -219,7 +225,7 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     } catch (error) {
       console.error("Error collecting monitoring data:", error);
     }
-  }, [getDockerSystemUsage]);
+  }, [getDockerSystemUsage, isPaused]);
 
   // Save to localStorage whenever data changes
   useEffect(() => {
@@ -258,8 +264,8 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     // Collect initial data
     collectData();
 
-    // Set up interval
-    intervalRef.current = setInterval(collectData, 1000);
+    // Set up interval (every 5 seconds to reduce SSH load)
+    intervalRef.current = setInterval(collectData, 5000);
   }, [collectData]);
 
   const stopMonitoring = useCallback(() => {
@@ -286,6 +292,14 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     } catch (error) {
       console.error("Error clearing monitoring data from storage:", error);
     }
+  }, []);
+
+  const pauseMonitoring = useCallback(() => {
+    setIsPaused(true);
+  }, []);
+
+  const resumeMonitoring = useCallback(() => {
+    setIsPaused(false);
   }, []);
 
   // Cleanup on unmount and ensure monitoring state consistency
@@ -319,6 +333,8 @@ export function MonitoringProvider({ children }: MonitoringProviderProps) {
     startMonitoring,
     stopMonitoring,
     clearHistory,
+    pauseMonitoring,
+    resumeMonitoring,
   };
 
   return (

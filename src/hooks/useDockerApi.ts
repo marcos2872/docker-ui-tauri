@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useDockerConnection } from "../contexts/DockerConnectionContext";
 
 // Tipos SSH adaptados para compatibilidade
@@ -92,13 +92,25 @@ export interface EnvVar {
 export function useDockerApi() {
   const { connectionType, currentSshConnection } = useDockerConnection();
 
+  // Queue to prevent simultaneous SSH commands
+  const commandQueueRef = useRef<Promise<any>>(Promise.resolve());
+
   const invokeCommand = useCallback(
     async (command: string, args: any = {}) => {
       if (connectionType === "ssh" && currentSshConnection) {
-        return await invoke(command, {
-          connectionId: currentSshConnection.id,
-          ...args,
+        // Queue the command to prevent simultaneous SSH calls
+        commandQueueRef.current = commandQueueRef.current.then(async () => {
+          try {
+            return await invoke(command, {
+              connectionId: currentSshConnection.id,
+              ...args,
+            });
+          } catch (error) {
+            console.error(`SSH command ${command} failed:`, error);
+            return null;
+          }
         });
+        return await commandQueueRef.current;
       } else {
         // Return default/empty data instead of throwing error
         return null;
