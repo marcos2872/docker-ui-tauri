@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FaTrash, FaSearch, FaPlus, FaSync, FaHdd } from "react-icons/fa";
 import { CreateVolumeModal } from "../../components/CreateVolumeModal";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, VolumeInfo } from "../../hooks/useDockerApi";
 
@@ -20,6 +21,9 @@ export function Volumes() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>(
+    {},
+  );
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const { listVolumes, removeVolume } = useDockerApi();
 
@@ -52,6 +56,7 @@ export function Volumes() {
       return;
     }
 
+    setLoadingActions((prev) => ({ ...prev, [volumeName]: true }));
     try {
       await removeVolume(volumeName);
       showSuccess("Volume removido com sucesso");
@@ -59,6 +64,8 @@ export function Volumes() {
     } catch (error) {
       console.error("Error removing volume:", error);
       showError("Erro ao remover volume");
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [volumeName]: false }));
     }
   };
 
@@ -132,24 +139,26 @@ export function Volumes() {
     className = "",
     disabled = false,
     title,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
     className?: string;
     disabled?: boolean;
     title: string;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        disabled
+      className={`p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center ${
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {loading ? <LoadingSpinner size={16} /> : <Icon className="w-4 h-4" />}
     </button>
   );
 
@@ -256,10 +265,14 @@ export function Volumes() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getUsageDot(volume.in_use)}`}
+                            className={`w-3 h-3 rounded-full ${getUsageDot(
+                              volume.in_use,
+                            )}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getUsageColor(volume.in_use)}`}
+                            className={`text-sm font-medium ${getUsageColor(
+                              volume.in_use,
+                            )}`}
                           >
                             {volume.in_use ? "Em uso" : "Sem uso"}
                           </span>
@@ -298,6 +311,7 @@ export function Volumes() {
                                 ? "Não é possível remover um volume em uso"
                                 : "Remover volume"
                             }
+                            loading={loadingActions[volume.name]}
                           />
                         </div>
                       </td>

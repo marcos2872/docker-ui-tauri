@@ -7,6 +7,7 @@ import {
   FaNetworkWired,
 } from "react-icons/fa";
 import { CreateNetworkModal } from "../../components/CreateNetworkModal";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, NetworkInfo } from "../../hooks/useDockerApi";
 
@@ -26,6 +27,9 @@ export function Networks() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>(
+    {},
+  );
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const { listNetworks, removeNetwork } = useDockerApi();
 
@@ -71,6 +75,7 @@ export function Networks() {
       return;
     }
 
+    setLoadingActions((prev) => ({ ...prev, [networkId]: true }));
     try {
       await removeNetwork(networkId);
       showSuccess("Network removida com sucesso");
@@ -78,6 +83,8 @@ export function Networks() {
     } catch (error) {
       console.error("Error removing network:", error);
       showError("Erro ao remover network");
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [networkId]: false }));
     }
   };
 
@@ -167,24 +174,26 @@ export function Networks() {
     className = "",
     disabled = false,
     title,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
     className?: string;
     disabled?: boolean;
     title: string;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        disabled
+      className={`p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center ${
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {loading ? <LoadingSpinner size={16} /> : <Icon className="w-4 h-4" />}
     </button>
   );
 
@@ -298,10 +307,14 @@ export function Networks() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getNetworkTypeDot(network.is_system)}`}
+                            className={`w-3 h-3 rounded-full ${getNetworkTypeDot(
+                              network.is_system,
+                            )}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getNetworkTypeColor(network.is_system)}`}
+                            className={`text-sm font-medium ${getNetworkTypeColor(
+                              network.is_system,
+                            )}`}
                           >
                             {network.is_system ? "Sistema" : "Custom"}
                           </span>
@@ -341,9 +354,10 @@ export function Networks() {
                               network.is_system
                                 ? "Não é possível remover uma network do sistema"
                                 : network.in_use
-                                  ? "Não é possível remover uma network com containers conectados"
-                                  : "Remover network"
+                                ? "Não é possível remover uma network com containers conectados"
+                                : "Remover network"
                             }
+                            loading={loadingActions[network.id]}
                           />
                         </div>
                       </td>

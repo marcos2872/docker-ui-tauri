@@ -15,7 +15,7 @@ pub struct SshContainerInfo {
     pub created: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SshImageInfo {
     pub id: String,
     pub repository: String,
@@ -23,6 +23,7 @@ pub struct SshImageInfo {
     pub created: String,
     pub size: String,
     pub in_use: bool,
+    pub children: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -311,72 +312,109 @@ impl<'a> SshDockerManager<'a> {
         Ok(())
     }
 
-    // Lista todas as imagens via SSH
+    // Lista todas as imagens via SSH, incluindo dependências
     pub async fn list_images(&self, connection_id: &str) -> Result<Vec<SshImageInfo>> {
-        // First get all container images to check usage
-        let containers_output = self
+        use serde_json::Value;
+        use std::collections::{HashMap, HashSet};
+
+        // 1. Get all container images to check usage
+        let used_images_output = self
             .ssh_client
             .execute_command(connection_id, "docker ps -a --format '{{.Image}}'")
             .await
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "Falha ao listar containers para verificar uso de imagens: {}",
-                    e
-                )
-            })?;
-
-        let used_images: std::collections::HashSet<String> = containers_output
+            .map_err(|e| anyhow::anyhow!("Failed to list containers for image usage: {}", e))?;
+        let used_images: HashSet<String> = used_images_output
             .lines()
             .map(|line| line.trim().to_string())
             .collect();
 
-        let output = self
+        // 2. Get inspect data for all images
+        // Using `docker images -q` to handle cases with no images gracefully
+        let inspect_output = self
             .ssh_client
             .execute_command(
                 connection_id,
-                "docker images -a --format '{{.ID}}|{{.Repository}}|{{.Tag}}|{{.CreatedAt}}|{{.Size}}'",
+                "docker images -q | xargs -r docker image inspect --format '{{json .}}'",
             )
             .await
-            .map_err(|e| anyhow::anyhow!("Falha ao listar imagens: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to inspect images: {}", e))?;
 
-        let mut images = Vec::new();
-        for line in output.lines() {
+        if inspect_output.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // 3. Parse JSON and build dependency tree
+        let mut images_map: HashMap<String, SshImageInfo> = HashMap::new();
+        let mut parent_to_children: HashMap<String, Vec<String>> = HashMap::new();
+
+        for line in inspect_output.lines() {
             if line.trim().is_empty() {
                 continue;
             }
 
-            let parts: Vec<&str> = line.split('|').collect();
-            if parts.len() >= 5 {
-                let repository = parts[1].trim();
-                let tag = parts[2].trim();
-                let id = parts[0].trim();
+            let v: Value = serde_json::from_str(line)?;
+            let id = v["Id"].as_str().unwrap_or("").to_string();
+            let parent = v["Parent"].as_str().unwrap_or("").to_string();
 
-                // Check if image is in use by checking different formats
-                let in_use = if repository == "<none>" || tag == "<none>" {
-                    // For images without proper names, check by ID (first 12 chars)
-                    let short_id = &id[..std::cmp::min(12, id.len())];
-                    used_images.contains(short_id) || used_images.contains(id)
+            if !parent.is_empty() {
+                parent_to_children
+                    .entry(parent)
+                    .or_default()
+                    .push(id.clone());
+            }
+
+            let repo_tags: Vec<String> = v["RepoTags"]
+                .as_array()
+                .unwrap_or(&vec![])
+                .iter()
+                .map(|tag| tag.as_str().unwrap_or("").to_string())
+                .collect();
+
+            let (repository, tag) = if let Some(repo_tag) = repo_tags.get(0) {
+                if let Some(pos) = repo_tag.rfind(':') {
+                    (
+                        repo_tag[..pos].to_string(),
+                        repo_tag[pos + 1..].to_string(),
+                    )
                 } else {
-                    // For named images, check repository:tag format
-                    let full_name = format!("{}:{}", repository, tag);
-                    used_images.contains(&full_name)
-                        || used_images.contains(repository)
-                        || used_images.contains(&id[..std::cmp::min(12, id.len())])
-                        || used_images.contains(id)
-                };
+                    (repo_tag.clone(), "<none>".to_string())
+                }
+            } else {
+                ("<none>".to_string(), "<none>".to_string())
+            };
 
-                images.push(SshImageInfo {
-                    id: id.to_string(),
-                    repository: repository.to_string(),
-                    tag: tag.to_string(),
-                    created: parts[3].trim().to_string(),
-                    size: parts[4].trim().to_string(),
+            let size_bytes = v["Size"].as_i64().unwrap_or(0);
+            let size = bytesize::ByteSize(size_bytes as u64).to_string_as(true);
+
+            let short_id = &id[..std::cmp::min(12, id.len())];
+            let full_name = format!("{}:{}", repository, tag);
+            let in_use = used_images.contains(&full_name)
+                || used_images.contains(repository.as_str())
+                || used_images.contains(short_id)
+                || used_images.contains(&id);
+
+            images_map.insert(
+                id.clone(),
+                SshImageInfo {
+                    id: id.clone(),
+                    repository,
+                    tag,
+                    created: v["Created"].as_str().unwrap_or("").to_string(),
+                    size,
                     in_use,
-                });
+                    children: Vec::new(), // Will be populated next
+                },
+            );
+        }
+
+        // 4. Populate children for each image
+        for (id, image_info) in images_map.iter_mut() {
+            if let Some(children) = parent_to_children.get(id) {
+                image_info.children = children.clone();
             }
         }
 
-        Ok(images)
+        Ok(images_map.values().cloned().collect())
     }
 
     // Remove uma imagem via SSH
@@ -547,13 +585,6 @@ impl<'a> SshDockerManager<'a> {
         &self,
         connection_id: &str,
     ) -> Result<SshDockerSystemUsage> {
-        // Get running containers
-        let containers = self.list_containers(connection_id).await?;
-        let running_containers: Vec<&SshContainerInfo> = containers
-            .iter()
-            .filter(|c| c.state.to_lowercase() == "running")
-            .collect();
-
         // Initialize totals
         let mut total_cpu = 0.0;
         let mut total_memory_usage = 0u64;
@@ -577,25 +608,25 @@ impl<'a> SshDockerManager<'a> {
             .unwrap_or_else(|_| "1073741824".to_string()); // Default 1GB
         let memory_limit = memory_info.trim().parse::<u64>().unwrap_or(1073741824);
 
-        // Collect stats for each running container
-        for container in running_containers {
-            // Get container stats using docker stats --no-stream
-            let stats_output = self
-                .ssh_client
-                .execute_command(
-                    connection_id,
-                    &format!(
-                        "docker stats {} --no-stream --format '{{{{.CPUPerc}}}}|{{{{.MemUsage}}}}|{{{{.NetIO}}}}|{{{{.BlockIO}}}}'",
-                        container.name
-                    ),
-                )
-                .await;
+        // Get stats for all running containers in one command
+        let stats_output = self
+            .ssh_client
+            .execute_command(
+                connection_id,
+                "docker stats --no-stream --format '{{.CPUPerc}}|{{.MemUsage}}|{{.NetIO}}|{{.BlockIO}}'",
+            )
+            .await;
 
-            if let Ok(stats) = stats_output {
-                let parts: Vec<&str> = stats.trim().split('|').collect();
+        if let Ok(stats) = stats_output {
+            for line in stats.lines() {
+                if line.trim().is_empty() {
+                    continue;
+                }
+
+                let parts: Vec<&str> = line.trim().split('|').collect();
                 if parts.len() >= 4 {
                     // Parse CPU percentage
-                    if let Ok(cpu_str) = parts[0].replace('%', "").parse::<f64>() {
+                    if let Ok(cpu_str) = parts[0].replace('%', "").trim().parse::<f64>() {
                         total_cpu += cpu_str;
                     }
 

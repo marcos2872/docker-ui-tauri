@@ -71,7 +71,7 @@ const LineChartComponent: React.FC<LineChartComponentProps> = React.memo(
         vAxis: {
           textStyle: { color: "#ffffff", fontSize: 11 },
           titleTextStyle: { color: "#ffffff" },
-          format: unit ? `#${unit}` : undefined,
+          format: unit === "%" ? "#,##0'%'": (unit ? `#${unit}` : undefined),
           gridlines: { color: showGrid ? "#555555" : "transparent" },
           minorGridlines: { color: "transparent" },
           minValue: minValue,

@@ -10,6 +10,7 @@ import {
   FaEye,
 } from "react-icons/fa";
 import { CreateContainerModal } from "../../components/CreateContainerModal";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ContainerInfo } from "../../hooks/useDockerApi";
 import { useMonitoring } from "../../contexts/MonitoringContext";
@@ -26,6 +27,9 @@ export function Containers() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<
+    Record<string, string | null>
+  >({});
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const {
     listContainers,
@@ -56,6 +60,7 @@ export function Containers() {
   };
 
   const handleContainerAction = async (containerId: string, action: string) => {
+    setLoadingActions((prev) => ({ ...prev, [containerId]: action }));
     try {
       switch (action) {
         case "start":
@@ -93,6 +98,8 @@ export function Containers() {
       showError(
         `Erro ao ${action === "start" ? "iniciar" : action === "stop" ? "parar" : action === "pause" ? "pausar" : action === "unpause" ? "retomar" : "remover"} container`,
       );
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [containerId]: null }));
     }
   };
 
@@ -206,24 +213,26 @@ export function Containers() {
     className = "",
     disabled = false,
     title,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
     className?: string;
     disabled?: boolean;
     title: string;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        disabled
+      className={`p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center ${
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {loading ? <LoadingSpinner size={16} /> : <Icon className="w-4 h-4" />}
     </button>
   );
 
@@ -354,10 +363,14 @@ export function Containers() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getStatusDot(container.state)}`}
+                            className={`w-3 h-3 rounded-full ${getStatusDot(
+                              container.state,
+                            )}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getStatusColor(container.state)}`}
+                            className={`text-sm font-medium ${getStatusColor(
+                              container.state,
+                            )}`}
                           >
                             {container.state}
                           </span>
@@ -417,6 +430,9 @@ export function Containers() {
                                 icon={FaStop}
                                 className="hover:bg-red-600"
                                 title="Parar container"
+                                loading={
+                                  loadingActions[container.id] === "stop"
+                                }
                               />
                               <ActionButton
                                 onClick={() =>
@@ -425,17 +441,26 @@ export function Containers() {
                                 icon={FaPause}
                                 className="hover:bg-yellow-600"
                                 title="Pausar container"
+                                loading={
+                                  loadingActions[container.id] === "pause"
+                                }
                               />
                             </>
                           ) : container.state.toLowerCase() === "paused" ? (
                             <>
                               <ActionButton
                                 onClick={() =>
-                                  handleContainerAction(container.id, "unpause")
+                                  handleContainerAction(
+                                    container.id,
+                                    "unpause",
+                                  )
                                 }
                                 icon={FaPlay}
                                 className="hover:bg-green-600"
                                 title="Retomar container"
+                                loading={
+                                  loadingActions[container.id] === "unpause"
+                                }
                               />
                               <ActionButton
                                 onClick={() =>
@@ -444,6 +469,9 @@ export function Containers() {
                                 icon={FaStop}
                                 className="hover:bg-red-600"
                                 title="Parar container"
+                                loading={
+                                  loadingActions[container.id] === "stop"
+                                }
                               />
                             </>
                           ) : (
@@ -454,6 +482,9 @@ export function Containers() {
                               icon={FaPlay}
                               className="hover:bg-green-600"
                               title="Iniciar container"
+                              loading={
+                                loadingActions[container.id] === "start"
+                              }
                             />
                           )}
 
@@ -479,6 +510,9 @@ export function Containers() {
                               container.state.toLowerCase() === "running"
                                 ? "Pare o container antes de removê-lo"
                                 : "Remover container"
+                            }
+                            loading={
+                              loadingActions[container.id] === "remove"
                             }
                           />
                         </div>

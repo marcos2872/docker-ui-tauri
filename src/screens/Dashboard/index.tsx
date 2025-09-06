@@ -22,7 +22,7 @@ interface DockerInfo {
 }
 
 export function Dashboard() {
-  const { getDockerInfo } = useDockerApi();
+  const { getDockerInfo, listImages } = useDockerApi();
   const { currentSshConnection, connectionType } = useDockerConnection();
   const [dockerInfo, setDockerInfo] = useState<DockerInfo>({
     version: "",
@@ -60,12 +60,19 @@ export function Dashboard() {
 
   const getDockerStats = useCallback(async () => {
     try {
-      const status = await getDockerInfo();
-      setDockerInfo(status);
+      const [status, imageList] = await Promise.all([
+        getDockerInfo(),
+        listImages(),
+      ]);
+
+      setDockerInfo({
+        ...status,
+        images: imageList.length,
+      });
     } catch (error) {
       console.error("Error fetching docker stats:", error);
     }
-  }, [getDockerInfo]);
+  }, [getDockerInfo, listImages]);
 
   // Start monitoring when component mounts and resume when entering dashboard
   useEffect(() => {
@@ -151,15 +158,15 @@ export function Dashboard() {
         />
         <Card title="Images" value={dockerInfo.images.toString()} />
         <Card
-          title="Containers Paused"
+          title="Containers Pausados"
           value={dockerInfo.containers_paused.toString()}
         />
         <Card
-          title="Containers Running"
+          title="Containers Rodando"
           value={dockerInfo.containers_running.toString()}
         />
         <Card
-          title="Containers Stopped"
+          title="Containers Parados"
           value={dockerInfo.containers_stopped.toString()}
         />
       </section>

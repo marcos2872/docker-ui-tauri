@@ -1,25 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
-import { FaTrash, FaSearch, FaDownload, FaSync, FaImage } from "react-icons/fa";
+import { FaTrash, FaSearch, FaDownload, FaSync, FaImage, FaSitemap } from "react-icons/fa";
 import { PullImageModal } from "../../components/PullImageModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
 import { format } from "date-fns";
-
-// Add a local extended interface to handle UI-specific properties
-interface ExtendedImageInfo extends ImageInfo {
-  in_use: boolean;
-}
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 type FilterType = "all" | "in_use" | "unused";
 
 export function Images() {
-  const [images, setImages] = useState<ExtendedImageInfo[]>([]);
-  const [filteredImages, setFilteredImages] = useState<ExtendedImageInfo[]>([]);
+  const [images, setImages] = useState<ImageInfo[]>([]);
+  const [filteredImages, setFilteredImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPullModalOpen, setIsPullModalOpen] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>(
+    {},
+  );
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const { listImages, removeImage } = useDockerApi();
 
@@ -27,10 +26,7 @@ export function Images() {
     try {
       setLoading(true);
       const imageList = await listImages();
-      const extendedImageList: ExtendedImageInfo[] = imageList.map((image) => ({
-        ...image,
-      }));
-      setImages(extendedImageList);
+      setImages(imageList);
     } catch (error) {
       console.error("Error fetching images:", error);
       showError("Erro ao buscar imagens");
@@ -45,21 +41,26 @@ export function Images() {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  const handleRemoveImage = async (imageId: string) => {
-    const image = images.find((img) => img.id === imageId);
-
-    if (image?.in_use) {
+  const handleRemoveImage = async (image: ImageInfo) => {
+    if (image.in_use) {
       showError("Não é possível remover uma imagem em uso por containers");
       return;
     }
+    if (image.children && image.children.length > 0) {
+      showError("Não é possível remover uma imagem que é base para outras");
+      return;
+    }
 
+    setLoadingActions((prev) => ({ ...prev, [image.id]: true }));
     try {
-      await removeImage(imageId);
+      await removeImage(image.id);
       showSuccess("Imagem removida com sucesso");
       await fetchImages();
     } catch (error) {
       console.error("Error removing image:", error);
       showError(`Erro ao remover imagem: ${error}`);
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [image.id]: false }));
     }
   };
 
@@ -153,24 +154,26 @@ export function Images() {
     className = "",
     disabled = false,
     title,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
     className?: string;
     disabled?: boolean;
     title: string;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        disabled
+      className={`p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center ${
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {loading ? <LoadingSpinner size={16} /> : <Icon className="w-4 h-4" />}
     </button>
   );
 
@@ -280,10 +283,14 @@ export function Images() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getUsageDot(image.in_use)}`}
+                            className={`w-3 h-3 rounded-full ${getUsageDot(
+                              image.in_use,
+                            )}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getUsageColor(image.in_use)}`}
+                            className={`text-sm font-medium ${getUsageColor(
+                              image.in_use,
+                            )}`}
                           >
                             {image.in_use ? "Em uso" : "Sem uso"}
                           </span>
@@ -296,6 +303,14 @@ export function Images() {
                         <div className="text-xs text-gray-400 font-mono">
                           {image.id.substring(0, 12)}
                         </div>
+                        {image.children && image.children.length > 0 && (
+                          <div className="mt-1 text-xs text-blue-400 flex items-center gap-1.5">
+                            <FaSitemap className="w-3 h-3" />
+                            <span>
+                              Dependências: {image.children.length}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {image.tag || "<none>"}
@@ -309,15 +324,21 @@ export function Images() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <ActionButton
-                            onClick={() => handleRemoveImage(image.id)}
+                            onClick={() => handleRemoveImage(image)}
                             icon={FaTrash}
                             className="hover:bg-red-600"
-                            disabled={image.in_use}
+                            disabled={
+                              image.in_use ||
+                              (image.children && image.children.length > 0)
+                            }
                             title={
                               image.in_use
-                                ? "Não é possível remover uma imagem em uso"
+                                ? "Não é possível remover uma imagem em uso por containers"
+                                : image.children && image.children.length > 0
+                                ? "Não é possível remover, pois outras imagens dependem dela"
                                 : "Remover imagem"
                             }
+                            loading={loadingActions[image.id]}
                           />
                         </div>
                       </td>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FaTimes, FaDownload } from "react-icons/fa";
 import { useDockerApi } from "../../hooks/useDockerApi";
+import { LoadingSpinner } from "../LoadingSpinner";
 
 interface PullImageModalProps {
   isOpen: boolean;
@@ -124,7 +125,7 @@ export function PullImageModal({
             >
               {isPulling ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <LoadingSpinner size={16} />
                   Fazendo Pull...
                 </>
               ) : (
