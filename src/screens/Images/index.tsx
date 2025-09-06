@@ -1,21 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { FaTrash, FaSearch, FaDownload, FaSync, FaImage } from "react-icons/fa";
+import { FaTrash, FaSearch, FaDownload, FaSync, FaImage, FaSitemap } from "react-icons/fa";
 import { PullImageModal } from "../../components/PullImageModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
 import { format } from "date-fns";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 
-// Add a local extended interface to handle UI-specific properties
-interface ExtendedImageInfo extends ImageInfo {
-  in_use: boolean;
-}
-
 type FilterType = "all" | "in_use" | "unused";
 
 export function Images() {
-  const [images, setImages] = useState<ExtendedImageInfo[]>([]);
-  const [filteredImages, setFilteredImages] = useState<ExtendedImageInfo[]>([]);
+  const [images, setImages] = useState<ImageInfo[]>([]);
+  const [filteredImages, setFilteredImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
@@ -31,10 +26,7 @@ export function Images() {
     try {
       setLoading(true);
       const imageList = await listImages();
-      const extendedImageList: ExtendedImageInfo[] = imageList.map((image) => ({
-        ...image,
-      }));
-      setImages(extendedImageList);
+      setImages(imageList);
     } catch (error) {
       console.error("Error fetching images:", error);
       showError("Erro ao buscar imagens");
@@ -49,24 +41,26 @@ export function Images() {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  const handleRemoveImage = async (imageId: string) => {
-    const image = images.find((img) => img.id === imageId);
-
-    if (image?.in_use) {
+  const handleRemoveImage = async (image: ImageInfo) => {
+    if (image.in_use) {
       showError("Não é possível remover uma imagem em uso por containers");
       return;
     }
+    if (image.children && image.children.length > 0) {
+      showError("Não é possível remover uma imagem que é base para outras");
+      return;
+    }
 
-    setLoadingActions((prev) => ({ ...prev, [imageId]: true }));
+    setLoadingActions((prev) => ({ ...prev, [image.id]: true }));
     try {
-      await removeImage(imageId);
+      await removeImage(image.id);
       showSuccess("Imagem removida com sucesso");
       await fetchImages();
     } catch (error) {
       console.error("Error removing image:", error);
       showError(`Erro ao remover imagem: ${error}`);
     } finally {
-      setLoadingActions((prev) => ({ ...prev, [imageId]: false }));
+      setLoadingActions((prev) => ({ ...prev, [image.id]: false }));
     }
   };
 
@@ -309,6 +303,14 @@ export function Images() {
                         <div className="text-xs text-gray-400 font-mono">
                           {image.id.substring(0, 12)}
                         </div>
+                        {image.children && image.children.length > 0 && (
+                          <div className="mt-1 text-xs text-blue-400 flex items-center gap-1.5">
+                            <FaSitemap className="w-3 h-3" />
+                            <span>
+                              Dependências: {image.children.length}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
                         {image.tag || "<none>"}
@@ -322,13 +324,18 @@ export function Images() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <ActionButton
-                            onClick={() => handleRemoveImage(image.id)}
+                            onClick={() => handleRemoveImage(image)}
                             icon={FaTrash}
                             className="hover:bg-red-600"
-                            disabled={image.in_use}
+                            disabled={
+                              image.in_use ||
+                              (image.children && image.children.length > 0)
+                            }
                             title={
                               image.in_use
-                                ? "Não é possível remover uma imagem em uso"
+                                ? "Não é possível remover uma imagem em uso por containers"
+                                : image.children && image.children.length > 0
+                                ? "Não é possível remover, pois outras imagens dependem dela"
                                 : "Remover imagem"
                             }
                             loading={loadingActions[image.id]}

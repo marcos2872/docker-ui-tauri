@@ -31,6 +31,7 @@ export interface ImageInfo {
   created: string;
   size: string;
   in_use: boolean;
+  children: string[];
 }
 
 export interface NetworkInfo {
