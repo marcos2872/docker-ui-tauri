@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FaTimes, FaServer, FaSpinner } from "react-icons/fa";
+import { FaTimes, FaServer } from "react-icons/fa";
+import { LoadingSpinner } from "../LoadingSpinner";
 
 interface ServerData {
   host: string;
@@ -247,8 +248,8 @@ export function AddServerModal({
             >
               {isConnecting ? (
                 <>
-                  <FaSpinner className="w-4 h-4 animate-spin" />
-                  Testando Conexão...
+                  <LoadingSpinner size={16} />
+                  Adicionando...
                 </>
               ) : (
                 <>

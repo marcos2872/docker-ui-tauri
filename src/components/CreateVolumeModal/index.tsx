@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FaTimes, FaHdd } from "react-icons/fa";
 import { useDockerApi } from "../../hooks/useDockerApi";
+import { LoadingSpinner } from "../LoadingSpinner";
 
 interface CreateVolumeModalProps {
   isOpen: boolean;
@@ -130,7 +131,7 @@ export function CreateVolumeModal({
             >
               {isCreating ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <LoadingSpinner size={16} />
                   Criando...
                 </>
               ) : (

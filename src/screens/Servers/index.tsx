@@ -12,6 +12,7 @@ import {
   FaEdit,
 } from "react-icons/fa";
 import { AddServerModal } from "../../components/AddServerModal";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerConnection } from "../../contexts/DockerConnectionContext";
 
@@ -57,6 +58,7 @@ export function Servers() {
   const [commandOutput, setCommandOutput] = useState("");
   const [isExecutingCommand, setIsExecutingCommand] = useState(false);
   const [editingName, setEditingName] = useState("");
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
   const { toasts, removeToast, showSuccess, showError } = useToast();
 
   const {
@@ -174,6 +176,7 @@ export function Servers() {
       return;
     }
 
+    setLoadingActions((prev) => ({ ...prev, [server.id]: true }));
     try {
       await invoke<string>("ssh_remove_saved_connection", {
         host: server.host,
@@ -185,6 +188,8 @@ export function Servers() {
     } catch (error) {
       console.error("Error removing server:", error);
       showError(`Erro ao remover servidor: ${error}`);
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [server.id]: false }));
     }
   };
 
@@ -272,6 +277,7 @@ export function Servers() {
     disabled = false,
     title,
     children,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
@@ -279,18 +285,19 @@ export function Servers() {
     disabled?: boolean;
     title: string;
     children?: React.ReactNode;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
       className={`flex items-center gap-1 px-2 py-1 rounded transition-colors text-xs ${
-        disabled
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-3 h-3" />
+      {loading ? <LoadingSpinner size={12} /> : <Icon className="w-3 h-3" />}
       {children}
     </button>
   );
@@ -508,6 +515,7 @@ export function Servers() {
                                   ? "Desconecte antes de remover"
                                   : "Remover servidor"
                               }
+                              loading={loadingActions[server.id]}
                             >
                               Remover
                             </ActionButton>

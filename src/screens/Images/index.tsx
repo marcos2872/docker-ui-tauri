@@ -4,6 +4,7 @@ import { PullImageModal } from "../../components/PullImageModal";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { useDockerApi, ImageInfo } from "../../hooks/useDockerApi";
 import { format } from "date-fns";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 // Add a local extended interface to handle UI-specific properties
 interface ExtendedImageInfo extends ImageInfo {
@@ -20,6 +21,9 @@ export function Images() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPullModalOpen, setIsPullModalOpen] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>(
+    {},
+  );
   const { toasts, removeToast, showSuccess, showError } = useToast();
   const { listImages, removeImage } = useDockerApi();
 
@@ -53,6 +57,7 @@ export function Images() {
       return;
     }
 
+    setLoadingActions((prev) => ({ ...prev, [imageId]: true }));
     try {
       await removeImage(imageId);
       showSuccess("Imagem removida com sucesso");
@@ -60,6 +65,8 @@ export function Images() {
     } catch (error) {
       console.error("Error removing image:", error);
       showError(`Erro ao remover imagem: ${error}`);
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [imageId]: false }));
     }
   };
 
@@ -153,24 +160,26 @@ export function Images() {
     className = "",
     disabled = false,
     title,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
     className?: string;
     disabled?: boolean;
     title: string;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        disabled
+      className={`p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center ${
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {loading ? <LoadingSpinner size={16} /> : <Icon className="w-4 h-4" />}
     </button>
   );
 
@@ -280,10 +289,14 @@ export function Images() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getUsageDot(image.in_use)}`}
+                            className={`w-3 h-3 rounded-full ${getUsageDot(
+                              image.in_use,
+                            )}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getUsageColor(image.in_use)}`}
+                            className={`text-sm font-medium ${getUsageColor(
+                              image.in_use,
+                            )}`}
                           >
                             {image.in_use ? "Em uso" : "Sem uso"}
                           </span>
@@ -318,6 +331,7 @@ export function Images() {
                                 ? "Não é possível remover uma imagem em uso"
                                 : "Remover imagem"
                             }
+                            loading={loadingActions[image.id]}
                           />
                         </div>
                       </td>
