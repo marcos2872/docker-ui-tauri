@@ -158,15 +158,15 @@ export function Dashboard() {
         />
         <Card title="Images" value={dockerInfo.images.toString()} />
         <Card
-          title="Containers Paused"
+          title="Containers Pausados"
           value={dockerInfo.containers_paused.toString()}
         />
         <Card
-          title="Containers Running"
+          title="Containers Rodando"
           value={dockerInfo.containers_running.toString()}
         />
         <Card
-          title="Containers Stopped"
+          title="Containers Parados"
           value={dockerInfo.containers_stopped.toString()}
         />
       </section>
