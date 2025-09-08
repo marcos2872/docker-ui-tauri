@@ -200,6 +200,24 @@ async fn docker_unpause_container(
 }
 
 #[tauri::command]
+async fn docker_restart_container(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager.restart_container(&container_id).await {
+        Ok(_) => {
+            set_docker_manager(&state, manager).await;
+            Ok("Container restarted successfully".to_string())
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn docker_remove_container(
     state: State<'_, DockerManagerState>,
     container_id: String,
@@ -412,6 +430,7 @@ pub fn run() {
             docker_stop_container,
             docker_pause_container,
             docker_unpause_container,
+            docker_restart_container,
             docker_remove_container,
             docker_create_container,
             docker_list_images,

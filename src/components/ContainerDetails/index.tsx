@@ -119,9 +119,6 @@ export function ContainerDetails({
         case "restart":
           command = "docker_restart_container";
           break;
-        case "remove":
-          command = "docker_remove_container";
-          break;
         default:
           return;
       }
