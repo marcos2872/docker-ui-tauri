@@ -10,7 +10,7 @@ import {
   FaChevronDown,
   FaChevronUp,
 } from "react-icons/fa";
-import { Chart } from "react-google-charts";
+import LineChartComponent from "../LineChart";
 import { LoadingSpinner } from "../LoadingSpinner";
 import { Header } from "../Header";
 import { ToastContainer, useToast } from "../Toast";
@@ -35,6 +35,11 @@ interface ContainerDetailsProps {
   onBack: () => void;
 }
 
+interface DataPoint {
+  time: string;
+  value: number;
+}
+
 export function ContainerDetails({
   containerId,
   onBack,
@@ -47,8 +52,8 @@ export function ContainerDetails({
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [cpuExpanded, setCpuExpanded] = useState(false);
   const [memoryExpanded, setMemoryExpanded] = useState(false);
-  const [cpuData, setCpuData] = useState<[string, number][]>([]);
-  const [memoryData, setMemoryData] = useState<[string, number][]>([]);
+  const [cpuData, setCpuData] = useState<DataPoint[]>([]);
+  const [memoryData, setMemoryData] = useState<DataPoint[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingActions, setLoadingActions] = useState<
     Record<string, string | null>
@@ -104,7 +109,7 @@ export function ContainerDetails({
       setCpuData((prev) => {
         const newData = [
           ...prev,
-          [timeStr, Math.round(cpuPercent * 100) / 100],
+          { time: timeStr, value: Math.round(cpuPercent * 100) / 100 },
         ];
         return newData.slice(-20);
       });
@@ -112,7 +117,7 @@ export function ContainerDetails({
       setMemoryData((prev) => {
         const newData = [
           ...prev,
-          [timeStr, Math.round(memoryPercent * 100) / 100],
+          { time: timeStr, value: Math.round(memoryPercent * 100) / 100 },
         ];
         return newData.slice(-20);
       });
@@ -580,7 +585,7 @@ export function ContainerDetails({
                   <div className="flex items-center gap-2">
                     {cpuData.length > 0 && (
                       <span className="text-sm text-gray-400">
-                        {cpuData[cpuData.length - 1][1]}%
+                        {cpuData[cpuData.length - 1].value}%
                       </span>
                     )}
                     {loadingStats && <LoadingSpinner size={16} />}
@@ -588,45 +593,27 @@ export function ContainerDetails({
                 </div>
 
                 {cpuExpanded && (
-                  <div className="p-4 pt-0">
-                    <div className="bg-white rounded-lg p-4 h-[300px]">
-                      {cpuData.length > 0 ? (
-                        <Chart
-                          chartType="LineChart"
-                          data={[["Tempo", "CPU (%)"], ...cpuData]}
-                          options={{
-                            title: "Uso de CPU em Tempo Real",
-                            titleTextStyle: { color: "#1f2937" },
-                            hAxis: {
-                              title: "Tempo",
-                              titleTextStyle: { color: "#6b7280" },
-                              textStyle: { color: "#6b7280" },
-                            },
-                            vAxis: {
-                              title: "Percentual (%)",
-                              titleTextStyle: { color: "#6b7280" },
-                              textStyle: { color: "#6b7280" },
-                              minValue: 0,
-                              maxValue: 100,
-                            },
-                            backgroundColor: "white",
-                            colors: ["#3b82f6"],
-                            legend: { position: "none" },
-                            chartArea: { width: "85%", height: "75%" },
-                            animation: {
-                              duration: 1000,
-                              easing: "out",
-                            },
-                          }}
-                          width="100%"
-                          height="300px"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-500">
-                          <p>Coletando dados de CPU...</p>
-                        </div>
-                      )}
-                    </div>
+                  <div className="p-4">
+                    {cpuData.length > 0 ? (
+                      <LineChartComponent
+                        data={cpuData}
+                        dataKey="CPU"
+                        title="Uso de CPU em Tempo Real"
+                        color="#3b82f6"
+                        height={300}
+                        unit="%"
+                        showGrid={true}
+                        showTooltip={true}
+                        showLegend={false}
+                        maxDataPoints={20}
+                        minValue={0}
+                        maxValue={100}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-[364px] text-gray-400 bg-gray-700 rounded-lg">
+                        <p>Coletando dados de CPU...</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -652,7 +639,7 @@ export function ContainerDetails({
                   <div className="flex items-center gap-2">
                     {memoryData.length > 0 && (
                       <span className="text-sm text-gray-400">
-                        {memoryData[memoryData.length - 1][1]}%
+                        {memoryData[memoryData.length - 1].value}%
                       </span>
                     )}
                     {loadingStats && <LoadingSpinner size={16} />}
@@ -660,45 +647,27 @@ export function ContainerDetails({
                 </div>
 
                 {memoryExpanded && (
-                  <div className="p-4 pt-0">
-                    <div className="bg-white rounded-lg p-4 h-[300px]">
-                      {memoryData.length > 0 ? (
-                        <Chart
-                          chartType="LineChart"
-                          data={[["Tempo", "Memória (%)"], ...memoryData]}
-                          options={{
-                            title: "Uso de Memória em Tempo Real",
-                            titleTextStyle: { color: "#1f2937" },
-                            hAxis: {
-                              title: "Tempo",
-                              titleTextStyle: { color: "#6b7280" },
-                              textStyle: { color: "#6b7280" },
-                            },
-                            vAxis: {
-                              title: "Percentual (%)",
-                              titleTextStyle: { color: "#6b7280" },
-                              textStyle: { color: "#6b7280" },
-                              minValue: 0,
-                              maxValue: 100,
-                            },
-                            backgroundColor: "white",
-                            colors: ["#10b981"],
-                            legend: { position: "none" },
-                            chartArea: { width: "85%", height: "75%" },
-                            animation: {
-                              duration: 1000,
-                              easing: "out",
-                            },
-                          }}
-                          width="100%"
-                          height="300px"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-500">
-                          <p>Coletando dados de memória...</p>
-                        </div>
-                      )}
-                    </div>
+                  <div className="p-4">
+                    {memoryData.length > 0 ? (
+                      <LineChartComponent
+                        data={memoryData}
+                        dataKey="Memória"
+                        title="Uso de Memória em Tempo Real"
+                        color="#10b981"
+                        height={300}
+                        unit="%"
+                        showGrid={true}
+                        showTooltip={true}
+                        showLegend={false}
+                        maxDataPoints={20}
+                        minValue={0}
+                        maxValue={100}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-[364px] text-gray-400 bg-gray-700 rounded-lg">
+                        <p>Coletando dados de memória...</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
