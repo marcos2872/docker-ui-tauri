@@ -1070,7 +1070,7 @@ impl DockerManager {
     // Obter logs de um container com paginação
     pub async fn get_container_logs(
         &self,
-        container_name: &str,
+        container_id: &str,
         tail_lines: Option<String>,
     ) -> Result<String> {
         use bollard::query_parameters::LogsOptions;
@@ -1084,7 +1084,7 @@ impl DockerManager {
             ..Default::default()
         };
 
-        let mut logs_stream = self.docker.logs(container_name, Some(logs_options));
+        let mut logs_stream = self.docker.logs(container_id, Some(logs_options));
 
         let mut logs = String::new();
         while let Some(log_result) = logs_stream.next().await {

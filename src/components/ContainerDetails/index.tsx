@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   FaArrowLeft,
@@ -7,6 +7,8 @@ import {
   FaPause,
   FaSync,
   FaRedo,
+  FaChevronDown,
+  FaChevronUp,
 } from "react-icons/fa";
 import { LoadingSpinner } from "../LoadingSpinner";
 import { Header } from "../Header";
@@ -39,10 +41,14 @@ export function ContainerDetails({
   const [container, setContainer] = useState<ContainerDetailsInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [logs, setLogs] = useState<string>("");
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [logsExpanded, setLogsExpanded] = useState(false);
   const [loadingActions, setLoadingActions] = useState<
     Record<string, string | null>
   >({});
   const { toasts, removeToast, showSuccess, showError } = useToast();
+  const logsContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchContainerDetails = async () => {
     try {
@@ -53,6 +59,7 @@ export function ContainerDetails({
           containerId: containerId,
         },
       );
+      console.log(details);
       setContainer(details);
     } catch (error) {
       console.error("Error fetching container details:", error);
@@ -62,9 +69,33 @@ export function ContainerDetails({
     }
   };
 
+  const scrollLogsToBottom = () => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop =
+        logsContainerRef.current.scrollHeight;
+    }
+  };
+
+  const fetchContainerLogs = async () => {
+    try {
+      setLoadingLogs(true);
+      const containerLogs: string = await invoke("docker_get_container_logs", {
+        containerId: containerId,
+      });
+      setLogs(containerLogs);
+      // Scroll para o final após carregar os logs
+      setTimeout(scrollLogsToBottom, 100);
+    } catch (error) {
+      console.error("Error fetching container logs:", error);
+      showError("Erro ao buscar logs do container");
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchContainerDetails();
+    await Promise.all([fetchContainerDetails(), fetchContainerLogs()]);
     setTimeout(() => setRefreshing(false), 500);
   };
 
@@ -120,6 +151,7 @@ export function ContainerDetails({
 
   useEffect(() => {
     fetchContainerDetails();
+    fetchContainerLogs();
   }, [containerId]);
 
   const getStatusColor = (state: string) => {
@@ -403,12 +435,24 @@ export function ContainerDetails({
                       {container.ports.length > 0 ? (
                         [...container.ports]
                           .sort((a, b) => a - b)
-                          .map((port) => (
+                          .reduce((pairs, _port, index, arr) => {
+                            if (index % 2 === 0) {
+                              const hostPort = arr[index];
+                              const containerPort = arr[index + 1];
+                              if (containerPort !== undefined) {
+                                pairs.push(`${hostPort}:${containerPort}`);
+                              } else {
+                                pairs.push(`${hostPort}:${hostPort}`);
+                              }
+                            }
+                            return pairs;
+                          }, [] as string[])
+                          .map((portPair, index) => (
                             <span
-                              key={port}
+                              key={`port-${index}`}
                               className="px-2 py-1 bg-blue-600 text-white text-xs rounded"
                             >
-                              {port}:{port}
+                              {portPair}
                             </span>
                           ))
                       ) : (
@@ -452,6 +496,69 @@ export function ContainerDetails({
                 </div>
               </div>
             )}
+
+            {/* Container Logs */}
+            <div className="bg-gray-800 rounded-lg overflow-hidden">
+              {/* Logs Header - Always Visible */}
+              <div
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-750 transition-colors border-b border-gray-700"
+                onClick={() => {
+                  setLogsExpanded(!logsExpanded);
+                  if (!logsExpanded && logs) {
+                    // Scroll para baixo quando expandir e já tiver logs
+                    setTimeout(scrollLogsToBottom, 100);
+                  }
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-semibold text-white">
+                    Logs (últimas 100 linhas)
+                  </h3>
+                  {logsExpanded ? (
+                    <FaChevronUp className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <FaChevronDown className="w-4 h-4 text-gray-400" />
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fetchContainerLogs();
+                  }}
+                  disabled={loadingLogs}
+                  className="flex items-center gap-2 px-3 py-1 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  <FaSync
+                    className={`w-3 h-3 ${loadingLogs ? "animate-spin" : ""}`}
+                  />
+                  {loadingLogs ? "Carregando..." : "Atualizar"}
+                </button>
+              </div>
+
+              {/* Logs Content - Collapsible */}
+              {logsExpanded && (
+                <div className="p-4 pt-0">
+                  <div
+                    ref={logsContainerRef}
+                    className="bg-black rounded-lg p-4 h-[500px] overflow-y-auto font-mono text-sm"
+                  >
+                    {loadingLogs ? (
+                      <div className="flex items-center justify-center h-full">
+                        <LoadingSpinner size={24} />
+                      </div>
+                    ) : logs ? (
+                      <pre className="text-gray-300 whitespace-pre-wrap leading-relaxed">
+                        {logs}
+                      </pre>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400">
+                        <p>Nenhum log disponível</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

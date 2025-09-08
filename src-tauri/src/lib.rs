@@ -107,6 +107,27 @@ async fn docker_get_container(
 }
 
 #[tauri::command]
+async fn docker_get_container_logs(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<String, String> {
+    let manager = get_docker_manager(&state).await?;
+    match manager
+        .get_container_logs(&container_id, Some("100".to_string()))
+        .await
+    {
+        Ok(logs) => {
+            set_docker_manager(&state, manager).await;
+            Ok(logs)
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
+#[tauri::command]
 async fn docker_start_container(
     state: State<'_, DockerManagerState>,
     container_id: String,
@@ -386,6 +407,7 @@ pub fn run() {
             docker_system_usage,
             docker_list_containers,
             docker_get_container,
+            docker_get_container_logs,
             docker_start_container,
             docker_stop_container,
             docker_pause_container,
