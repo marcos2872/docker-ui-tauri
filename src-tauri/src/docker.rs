@@ -817,33 +817,9 @@ impl DockerManager {
                     .as_ref()
                     .and_then(|m| m.usage)
                     .unwrap_or(0);
-                // let memory_limit = stats
-                //     .memory_stats
-                //     .as_ref()
-                //     .and_then(|m| m.limit)
-                //     .unwrap_or(0);
-
-                // let memory_percentage = if memory_limit > 0 {
-                //     (memory_usage as f64 / memory_limit as f64) * 100.0
-                // } else {
-                //     0.0
-                // };
 
                 let (network_rx, network_tx) = self.get_network_stats(&stats);
                 let (block_read, block_write) = self.get_block_stats(&stats);
-
-                // containers_stats.push(ContainerStats {
-                //     id: container.id.clone(),
-                //     name: container.name.clone(),
-                //     cpu_percentage,
-                //     memory_usage,
-                //     memory_limit,
-                //     memory_percentage,
-                //     network_rx,
-                //     network_tx,
-                //     block_read,
-                //     block_write,
-                // });
 
                 online_cpu = cpus_online;
                 total_cpu += cpu_percentage;
@@ -855,23 +831,15 @@ impl DockerManager {
             }
         }
 
-        // let memory_percentage = if total_memory_limit > 0 {
-        //     (total_memory_usage as f64 / total_memory_limit as f64) * 100.0
-        // } else {
-        //     0.0
-        // };
-
         Ok(DockerSystemUsage {
             cpu_online: online_cpu,
             cpu_usage: total_cpu,
             memory_usage: total_memory_usage,
             memory_limit: total_memory_limit,
-            // memory_percentage,
             network_rx_bytes: total_network_rx,
             network_tx_bytes: total_network_tx,
             block_read_bytes: total_block_read,
             block_write_bytes: total_block_write,
-            // containers_stats,
         })
     }
 
