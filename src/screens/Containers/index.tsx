@@ -11,6 +11,7 @@ import {
   FaEye,
 } from "react-icons/fa";
 import { CreateContainerModal } from "../../components/CreateContainerModal";
+import { ContainerDetails } from "../../components/ContainerDetails";
 import { ToastContainer, useToast } from "../../components/Toast";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { formatDate } from "../../utils/formatDate";
@@ -37,6 +38,9 @@ export function Containers() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedContainerId, setSelectedContainerId] = useState<string | null>(
+    null,
+  );
   const [loadingActions, setLoadingActions] = useState<
     Record<string, string | null>
   >({});
@@ -248,6 +252,16 @@ export function Containers() {
   };
 
   const counts = getFilterCounts();
+
+  // Se um container foi selecionado, mostrar detalhes
+  if (selectedContainerId) {
+    return (
+      <ContainerDetails
+        containerId={selectedContainerId}
+        onBack={() => setSelectedContainerId(null)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col w-full p-4 gap-6 h-full">
@@ -479,12 +493,10 @@ export function Containers() {
                           )}
 
                           <ActionButton
-                            onClick={() =>
-                              console.log("View logs:", container.id)
-                            }
+                            onClick={() => setSelectedContainerId(container.id)}
                             icon={FaEye}
                             className="hover:bg-blue-600"
-                            title="Ver logs"
+                            title="Ver detalhes"
                           />
 
                           <ActionButton

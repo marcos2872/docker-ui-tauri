@@ -309,6 +309,51 @@ impl DockerManager {
         Ok(container_infos)
     }
 
+    // Obtém detalhes de um container específico
+    pub async fn get_container(&self, container_id: &str) -> Result<ContainerInfo> {
+        let containers = self
+            .docker
+            .list_containers(Some(ListContainersOptions {
+                all: true,
+                ..Default::default()
+            }))
+            .await
+            .context("Falha ao listar containers")?;
+
+        for container in containers {
+            let empty_string = String::new();
+            let id = container.id.as_ref().unwrap_or(&empty_string);
+            if id == container_id || id.starts_with(container_id) {
+                return Ok(ContainerInfo {
+                    id: id.clone(),
+                    name: container
+                        .names
+                        .unwrap_or_default()
+                        .join(", ")
+                        .trim_start_matches('/')
+                        .to_string(),
+                    image: container.image.unwrap_or_default(),
+                    state: container
+                        .state
+                        .map_or("unknown".to_string(), |s| s.to_string()),
+                    status: container.status.unwrap_or_default(),
+                    ports: container
+                        .ports
+                        .unwrap_or_default()
+                        .iter()
+                        .filter_map(|port| port.public_port.map(|p| p as i32))
+                        .collect(),
+                    created: container.created.unwrap_or_default(),
+                });
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "Container não encontrado: {}",
+            container_id
+        ))
+    }
+
     // Inicia um container
     pub async fn start_container(&self, container_name: &str) -> Result<()> {
         let output = Command::new("docker")
