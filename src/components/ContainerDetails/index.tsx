@@ -10,6 +10,7 @@ import {
   FaChevronDown,
   FaChevronUp,
 } from "react-icons/fa";
+import { Chart } from "react-google-charts";
 import { LoadingSpinner } from "../LoadingSpinner";
 import { Header } from "../Header";
 import { ToastContainer, useToast } from "../Toast";
@@ -44,6 +45,11 @@ export function ContainerDetails({
   const [logs, setLogs] = useState<string>("");
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logsExpanded, setLogsExpanded] = useState(false);
+  const [cpuExpanded, setCpuExpanded] = useState(false);
+  const [memoryExpanded, setMemoryExpanded] = useState(false);
+  const [cpuData, setCpuData] = useState<[string, number][]>([]);
+  const [memoryData, setMemoryData] = useState<[string, number][]>([]);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [loadingActions, setLoadingActions] = useState<
     Record<string, string | null>
   >({});
@@ -73,6 +79,47 @@ export function ContainerDetails({
     if (logsContainerRef.current) {
       logsContainerRef.current.scrollTop =
         logsContainerRef.current.scrollHeight;
+    }
+  };
+
+  const fetchContainerStats = async () => {
+    if (container?.state.toLowerCase() !== "running") {
+      return;
+    }
+
+    try {
+      setLoadingStats(true);
+      const stats: [number, number] = await invoke(
+        "docker_get_container_stats_for_graph",
+        {
+          containerId: containerId,
+        },
+      );
+
+      const [cpuPercent, memoryPercent] = stats;
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString();
+
+      // Adiciona novos dados mantendo apenas os últimos 20 pontos
+      setCpuData((prev) => {
+        const newData = [
+          ...prev,
+          [timeStr, Math.round(cpuPercent * 100) / 100],
+        ];
+        return newData.slice(-20);
+      });
+
+      setMemoryData((prev) => {
+        const newData = [
+          ...prev,
+          [timeStr, Math.round(memoryPercent * 100) / 100],
+        ];
+        return newData.slice(-20);
+      });
+    } catch (error) {
+      console.error("Error fetching container stats:", error);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -150,6 +197,25 @@ export function ContainerDetails({
     fetchContainerDetails();
     fetchContainerLogs();
   }, [containerId]);
+
+  // Busca stats em tempo real se o container estiver rodando
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (container?.state.toLowerCase() === "running") {
+      // Busca stats iniciais
+      fetchContainerStats();
+
+      // Atualiza a cada 3 segundos
+      interval = setInterval(fetchContainerStats, 3000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [container?.state, containerId]);
 
   const getStatusColor = (state: string) => {
     switch (state.toLowerCase()) {
@@ -491,6 +557,150 @@ export function ContainerDetails({
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* CPU Usage Graph */}
+            {container.state.toLowerCase() === "running" && (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <div
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-750 transition-colors border-b border-gray-700"
+                  onClick={() => setCpuExpanded(!cpuExpanded)}
+                >
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-white">
+                      Uso de CPU
+                    </h3>
+                    {cpuExpanded ? (
+                      <FaChevronUp className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <FaChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {cpuData.length > 0 && (
+                      <span className="text-sm text-gray-400">
+                        {cpuData[cpuData.length - 1][1]}%
+                      </span>
+                    )}
+                    {loadingStats && <LoadingSpinner size={16} />}
+                  </div>
+                </div>
+
+                {cpuExpanded && (
+                  <div className="p-4 pt-0">
+                    <div className="bg-white rounded-lg p-4 h-[300px]">
+                      {cpuData.length > 0 ? (
+                        <Chart
+                          chartType="LineChart"
+                          data={[["Tempo", "CPU (%)"], ...cpuData]}
+                          options={{
+                            title: "Uso de CPU em Tempo Real",
+                            titleTextStyle: { color: "#1f2937" },
+                            hAxis: {
+                              title: "Tempo",
+                              titleTextStyle: { color: "#6b7280" },
+                              textStyle: { color: "#6b7280" },
+                            },
+                            vAxis: {
+                              title: "Percentual (%)",
+                              titleTextStyle: { color: "#6b7280" },
+                              textStyle: { color: "#6b7280" },
+                              minValue: 0,
+                              maxValue: 100,
+                            },
+                            backgroundColor: "white",
+                            colors: ["#3b82f6"],
+                            legend: { position: "none" },
+                            chartArea: { width: "85%", height: "75%" },
+                            animation: {
+                              duration: 1000,
+                              easing: "out",
+                            },
+                          }}
+                          width="100%"
+                          height="300px"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          <p>Coletando dados de CPU...</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Memory Usage Graph */}
+            {container.state.toLowerCase() === "running" && (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <div
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-750 transition-colors border-b border-gray-700"
+                  onClick={() => setMemoryExpanded(!memoryExpanded)}
+                >
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-white">
+                      Uso de Memória
+                    </h3>
+                    {memoryExpanded ? (
+                      <FaChevronUp className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <FaChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {memoryData.length > 0 && (
+                      <span className="text-sm text-gray-400">
+                        {memoryData[memoryData.length - 1][1]}%
+                      </span>
+                    )}
+                    {loadingStats && <LoadingSpinner size={16} />}
+                  </div>
+                </div>
+
+                {memoryExpanded && (
+                  <div className="p-4 pt-0">
+                    <div className="bg-white rounded-lg p-4 h-[300px]">
+                      {memoryData.length > 0 ? (
+                        <Chart
+                          chartType="LineChart"
+                          data={[["Tempo", "Memória (%)"], ...memoryData]}
+                          options={{
+                            title: "Uso de Memória em Tempo Real",
+                            titleTextStyle: { color: "#1f2937" },
+                            hAxis: {
+                              title: "Tempo",
+                              titleTextStyle: { color: "#6b7280" },
+                              textStyle: { color: "#6b7280" },
+                            },
+                            vAxis: {
+                              title: "Percentual (%)",
+                              titleTextStyle: { color: "#6b7280" },
+                              textStyle: { color: "#6b7280" },
+                              minValue: 0,
+                              maxValue: 100,
+                            },
+                            backgroundColor: "white",
+                            colors: ["#10b981"],
+                            legend: { position: "none" },
+                            chartArea: { width: "85%", height: "75%" },
+                            animation: {
+                              duration: 1000,
+                              easing: "out",
+                            },
+                          }}
+                          width="100%"
+                          height="300px"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                          <p>Coletando dados de memória...</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

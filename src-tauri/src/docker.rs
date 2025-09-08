@@ -1193,6 +1193,56 @@ impl DockerManager {
         }
     }
 
+    // Obter estatísticas em tempo real de um container para gráficos
+    pub async fn get_container_stats_for_graph(
+        &mut self,
+        container_id: &str,
+    ) -> Result<(f64, f64)> {
+        use bollard::query_parameters::StatsOptions;
+        use futures_util::StreamExt;
+
+        let stats_options = Some(StatsOptions {
+            stream: false,
+            one_shot: true,
+        });
+
+        let mut stats_stream = self.docker.stats(container_id, stats_options);
+
+        if let Some(stats_result) = stats_stream.next().await {
+            match stats_result {
+                Ok(stats) => {
+                    // Calcula CPU
+                    let current_time = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    let cpu_calc = self.calculate_cpu_percentage_with_cache(
+                        container_id,
+                        &stats,
+                        current_time,
+                    );
+                    let cpu_percentage = cpu_calc.usage_cpu;
+
+                    // Calcula memória em percentual
+                    let memory_stats = stats.memory_stats.as_ref().cloned().unwrap_or_default();
+                    let memory_usage = memory_stats.usage.unwrap_or(0) as f64;
+                    let memory_limit = memory_stats.limit.unwrap_or(0) as f64;
+
+                    let memory_percentage = if memory_limit > 0.0 {
+                        (memory_usage / memory_limit) * 100.0
+                    } else {
+                        0.0
+                    };
+
+                    Ok((cpu_percentage, memory_percentage))
+                }
+                Err(e) => Err(anyhow::anyhow!("Erro ao obter stats do container: {}", e)),
+            }
+        } else {
+            Err(anyhow::anyhow!("Nenhum stat recebido para o container"))
+        }
+    }
+
     // Cria um novo container
     pub async fn create_container(&self, request: CreateContainerRequest) -> Result<String> {
         use bollard::models::{

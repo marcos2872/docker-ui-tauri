@@ -414,6 +414,24 @@ async fn docker_create_network(
     }
 }
 
+#[tauri::command]
+async fn docker_get_container_stats_for_graph(
+    state: State<'_, DockerManagerState>,
+    container_id: String,
+) -> Result<(f64, f64), String> {
+    let mut manager = get_docker_manager(&state).await?;
+    match manager.get_container_stats_for_graph(&container_id).await {
+        Ok(stats) => {
+            set_docker_manager(&state, manager).await;
+            Ok(stats)
+        }
+        Err(e) => {
+            set_docker_manager(&state, manager).await;
+            Err(e.to_string())
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -442,6 +460,7 @@ pub fn run() {
             docker_list_networks,
             docker_remove_network,
             docker_create_network,
+            docker_get_container_stats_for_graph,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
