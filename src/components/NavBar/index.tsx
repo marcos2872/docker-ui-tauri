@@ -59,14 +59,6 @@ export function NavBar({ changeScreen, screen }: IProps) {
         >
           <p className="text-sm text-gray-300">Networks</p>
         </button>
-        <button
-          className={`w-full h-8 ${screen == 5 ? "bg-gray-700" : "bg-gray-800"} rounded-md`}
-          onClick={() => {
-            changeScreen(5);
-          }}
-        >
-          <p className="text-sm text-gray-300">Servers</p>
-        </button>
       </section>
       <div className="w-full flex justify-center">
         <p className="text-[10px] font-semibold text-green-500">{status}</p>

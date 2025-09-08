@@ -12,6 +12,8 @@ import {
 } from "react-icons/fa";
 import { CreateContainerModal } from "../../components/CreateContainerModal";
 import { ToastContainer, useToast } from "../../components/Toast";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
+import { formatDate } from "../../utils/formatDate";
 
 interface ContainerInfo {
   id: string;
@@ -35,6 +37,9 @@ export function Containers() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<
+    Record<string, string | null>
+  >({});
   const { toasts, removeToast, showSuccess, showError } = useToast();
 
   const fetchContainers = useCallback(async () => {
@@ -59,6 +64,7 @@ export function Containers() {
   };
 
   const handleContainerAction = async (containerId: string, action: string) => {
+    setLoadingActions((prev) => ({ ...prev, [containerId]: action }));
     try {
       let command = "";
       switch (action) {
@@ -98,17 +104,9 @@ export function Containers() {
       showError(
         `Erro ao ${action === "start" ? "iniciar" : action === "stop" ? "parar" : action === "pause" ? "pausar" : action === "unpause" ? "retomar" : "remover"} container`,
       );
+    } finally {
+      setLoadingActions((prev) => ({ ...prev, [containerId]: null }));
     }
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const getStatusColor = (state: string) => {
@@ -210,24 +208,26 @@ export function Containers() {
     className = "",
     disabled = false,
     title,
+    loading = false,
   }: {
     onClick: () => void;
     icon: React.ComponentType<any>;
     className?: string;
     disabled?: boolean;
     title: string;
+    loading?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       title={title}
-      className={`p-2 rounded-lg transition-colors ${
-        disabled
+      className={`p-2 rounded-lg transition-colors w-9 h-9 flex items-center justify-center ${
+        disabled || loading
           ? "bg-gray-600 text-gray-400 cursor-not-allowed"
           : `bg-gray-700 text-gray-300 hover:bg-gray-600 ${className}`
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {loading ? <LoadingSpinner size={16} /> : <Icon className="w-4 h-4" />}
     </button>
   );
 
@@ -326,25 +326,25 @@ export function Containers() {
         ) : (
           <div className="bg-gray-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full text-left table-fixed">
                 <thead>
                   <tr className="bg-gray-700 border-b border-gray-600">
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Status
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Nome
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Imagem
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-28">
                       Portas
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-32">
                       Criado
                     </th>
-                    <th className="px-6 py-4 text-sm font-medium text-gray-300">
+                    <th className="px-6 py-4 text-sm font-medium text-gray-300 w-60">
                       Ações
                     </th>
                   </tr>
@@ -358,22 +358,26 @@ export function Containers() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-3 h-3 rounded-full ${getStatusDot(container.state)}`}
+                            className={`w-3 h-3 rounded-full ${getStatusDot(
+                              container.state,
+                            )}`}
                           ></div>
                           <span
-                            className={`text-sm font-medium ${getStatusColor(container.state)}`}
+                            className={`text-sm font-medium ${getStatusColor(
+                              container.state,
+                            )}`}
                           >
                             {container.state}
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 max-w-32">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-white font-medium">
                           <span
                             title={container.name}
                             className="block truncate"
                           >
-                            {container.name}{" "}
+                            {container.name}
                           </span>
                         </div>
                         <div className="text-xs text-gray-400 font-mono">
@@ -381,18 +385,37 @@ export function Containers() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {container.image}
+                        <span
+                          title={container.image}
+                          className="block truncate"
+                        >
+                          {container.image}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {container.ports.length > 0
-                          ? container.ports.join(", ")
-                          : "- : -"}
+                        <span
+                          title={
+                            container.ports.length > 0
+                              ? container.ports.join(", ")
+                              : "N/A"
+                          }
+                          className="block truncate"
+                        >
+                          {container.ports.length > 0
+                            ? container.ports.join(", ")
+                            : "N/A"}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-300">
-                        {formatDate(container.created)}
+                        <span
+                          title={formatDate(container.created)}
+                          className="block truncate"
+                        >
+                          {formatDate(container.created)}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           {container.state.toLowerCase() === "running" ? (
                             <>
                               <ActionButton
@@ -402,6 +425,9 @@ export function Containers() {
                                 icon={FaStop}
                                 className="hover:bg-red-600"
                                 title="Parar container"
+                                loading={
+                                  loadingActions[container.id] === "stop"
+                                }
                               />
                               <ActionButton
                                 onClick={() =>
@@ -410,6 +436,9 @@ export function Containers() {
                                 icon={FaPause}
                                 className="hover:bg-yellow-600"
                                 title="Pausar container"
+                                loading={
+                                  loadingActions[container.id] === "pause"
+                                }
                               />
                             </>
                           ) : container.state.toLowerCase() === "paused" ? (
@@ -421,6 +450,9 @@ export function Containers() {
                                 icon={FaPlay}
                                 className="hover:bg-green-600"
                                 title="Retomar container"
+                                loading={
+                                  loadingActions[container.id] === "unpause"
+                                }
                               />
                               <ActionButton
                                 onClick={() =>
@@ -429,6 +461,9 @@ export function Containers() {
                                 icon={FaStop}
                                 className="hover:bg-red-600"
                                 title="Parar container"
+                                loading={
+                                  loadingActions[container.id] === "stop"
+                                }
                               />
                             </>
                           ) : (
@@ -439,6 +474,7 @@ export function Containers() {
                               icon={FaPlay}
                               className="hover:bg-green-600"
                               title="Iniciar container"
+                              loading={loadingActions[container.id] === "start"}
                             />
                           )}
 
@@ -465,6 +501,7 @@ export function Containers() {
                                 ? "Pare o container antes de removê-lo"
                                 : "Remover container"
                             }
+                            loading={loadingActions[container.id] === "remove"}
                           />
                         </div>
                       </td>

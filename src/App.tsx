@@ -7,7 +7,6 @@ import { Images } from "./screens/Images";
 import { Containers } from "./screens/Containers";
 import { Volumes } from "./screens/Volumes";
 import { Networks } from "./screens/Networks";
-import { Servers } from "./screens/Servers";
 import { MonitoringProvider } from "./contexts/MonitoringContext";
 
 function App() {
@@ -25,7 +24,6 @@ function App() {
             {screen === 2 && <Images />}
             {screen === 3 && <Volumes />}
             {screen === 4 && <Networks />}
-            {screen === 5 && <Servers />}
           </section>
         </section>
       </main>

@@ -28,15 +28,8 @@ export function Dashboard() {
     architecture: "",
   });
 
-  const {
-    currentSystemUsage,
-    isMonitoring,
-    dataPointsCount,
-    lastUpdate,
-    startMonitoring,
-    stopMonitoring,
-    clearHistory,
-  } = useMonitoring();
+  const { currentSystemUsage, dataPointsCount, startMonitoring } =
+    useMonitoring();
 
   const {
     cpuHistory,
@@ -87,28 +80,12 @@ export function Dashboard() {
   return (
     <div className="flex flex-col w-full p-4 justify-center gap-6">
       {/* Header with Monitoring Controls */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
+      <div className="flex items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          {lastUpdate && (
-            <div className="flex items-center gap-4 text-sm text-gray-400">
-              <span>
-                Última atualização: {lastUpdate.toLocaleTimeString("pt-BR")}
-              </span>
-              <span className="text-yellow-400">
-                {Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s atrás
-              </span>
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-4 text-sm text-gray-300">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-3 h-3 rounded-full ${isMonitoring ? "bg-green-400 animate-pulse" : "bg-red-400"}`}
-              ></div>
-              <span>Monitoramento {isMonitoring ? "Ativo" : "Inativo"}</span>
-            </div>
             {dataPointsCount > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-blue-400">{dataPointsCount} pontos</span>
@@ -118,25 +95,7 @@ export function Dashboard() {
               </div>
             )}
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={isMonitoring ? stopMonitoring : startMonitoring}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isMonitoring
-                  ? "bg-red-600 hover:bg-red-500 text-white"
-                  : "bg-green-600 hover:bg-green-500 text-white"
-              }`}
-            >
-              {isMonitoring ? "Parar" : "Iniciar"} Monitoramento
-            </button>
-            <button
-              onClick={clearHistory}
-              disabled={dataPointsCount === 0}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Limpar Histórico
-            </button>
-          </div>
+          <div className="flex gap-2"></div>
         </div>
       </div>
 
